@@ -1,0 +1,91 @@
+repos:
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v5.0.0
+  hooks:
+  - id: check-added-large-files
+    args: [--maxkb=50000]
+  - id: mixed-line-ending
+    args: [--fix=lf]
+  - id: check-ast
+  - id: check-builtin-literals
+  - id: check-case-conflict
+  - id: check-docstring-first
+  - id: check-shebang-scripts-are-executable
+  - id: check-merge-conflict
+  - id: check-json
+  - id: check-toml
+  - id: check-xml
+  - id: check-yaml
+  - id: debug-statements
+  - id: destroyed-symlinks
+  - id: detect-private-key
+  - id: end-of-file-fixer
+    exclude: ^LICENSE|\.(html|csv|txt|svg|py)$
+  - id: pretty-format-json
+    args: [--autofix, --no-ensure-ascii, --no-sort-keys]
+  - id: trailing-whitespace
+    args: [--markdown-linebreak-ext=md]
+    exclude: \.(html|svg)$
+
+- repo: https://github.com/bwhmather/ssort
+  rev: 0.14.0
+  hooks:
+  - id: ssort
+    name: Sort top level statements with ssort
+
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.8.4
+  hooks:
+  - id: ruff
+    name: Linting with Ruff
+    types_or: [python, jupyter]
+    args: [--fix]
+  - id: ruff-format
+    name: Formatting with Ruff
+    types_or: [python, jupyter]
+
+- repo: https://github.com/PyCQA/doc8
+  rev: v1.1.2
+  hooks:
+  - id: doc8
+    name: Check documentation formats with doc8
+    args: [--max-line-length, '100']
+
+- repo: https://github.com/codespell-project/codespell
+  rev: v2.3.0
+  hooks:
+  - id: codespell
+    name: Check common misspellings in text files with codespell.
+    additional_dependencies:
+    - tomli
+
+- repo: https://github.com/tox-dev/pyproject-fmt
+  rev: v2.5.0
+  hooks:
+  - id: pyproject-fmt
+    name: Apply a consistent format to pyproject.toml
+
+- repo: https://github.com/macisamuele/language-formatters-pre-commit-hooks
+  rev: v2.14.0
+  hooks:
+  - id: pretty-format-yaml
+    args: [--autofix, --indent, '2']
+
+- repo: https://github.com/rhysd/actionlint
+  rev: v1.7.4
+  hooks:
+  - id: actionlint
+    files: .github/workflows/
+    args: [-ignore, SC1090, -ignore, SC2046, -ignore, SC2086, -ignore, SC2129, -ignore, SC2155]
+
+- repo: https://github.com/executablebooks/mdformat
+  rev: 0.7.21
+  hooks:
+  - id: mdformat
+    additional_dependencies:
+    - mdformat-ruff
+    - ruff
+    - mdformat-config
+    - mdformat-mkdocs
+    - mdformat-toc
+    - mdformat-admon

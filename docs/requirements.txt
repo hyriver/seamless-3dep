@@ -1,0 +1,6 @@
+black
+mdx-truly-sane-lists>=1.3
+mkdocs>=1.5.3
+mkdocs-jupyter
+mkdocs-material>=9.5.20
+mkdocstrings-python

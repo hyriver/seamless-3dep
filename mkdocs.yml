@@ -1,0 +1,143 @@
+site_name: SeamlessDEM
+site_url: https://seamless_3dep.readthedocs.io
+
+theme:
+  name: material
+  custom_dir: docs/overrides
+  favicon: assets/hyriver_logo.png
+  logo: assets/hyriver_logo.png
+  font:
+    text: Red Hat Text
+    code: JetBrains Mono
+
+  palette:
+    # Palette toggle for automatic mode
+  - media: (prefers-color-scheme)
+    toggle:
+      icon: material/brightness-auto
+      name: Switch to light mode
+
+    # Palette toggle for light mode
+  - media: '(prefers-color-scheme: light)'
+    scheme: default
+    primary: prefix-light
+    accent: prefix-light
+    toggle:
+      icon: material/brightness-7
+      name: Switch to dark mode
+
+    # Palette toggle for dark mode
+  - media: '(prefers-color-scheme: dark)'
+    scheme: slate
+    primary: prefix
+    accent: prefix
+    toggle:
+      icon: material/brightness-4
+      name: Switch to system preference
+
+  icon:
+    edit: material/pencil
+    view: material/eye
+
+  features:
+  - content.tabs.link
+  - content.code.copy
+  - content.action.edit
+  - content.code.annotate
+  - navigation.sections
+  - navigation.expand
+  - navigation.collapse
+  - navigation.instant
+  - navigation.instant.progress
+  - navigation.tracking
+  - navigation.top
+  - navigation.footer
+  - navigation.indexes
+  - navigation.tabs
+  - navigation.tabs.sticky
+  - navigation.path
+  - search.suggest
+  - search.highlight
+  - toc.follow
+  - toc.integrate
+
+repo_url: https://github.com/hyriver/seamless_3dep/
+edit_uri: edit/main/docs/
+
+markdown_extensions:
+- attr_list
+- md_in_html
+- admonition
+- def_list
+- footnotes
+- pymdownx.tasklist:
+    custom_checkbox: true
+- pymdownx.highlight:
+    anchor_linenums: true
+    line_spans: __span
+    pygments_lang_class: true
+- pymdownx.inlinehilite
+- pymdownx.snippets
+- pymdownx.details
+- pymdownx.superfences
+- pymdownx.superfences:
+    custom_fences:
+    - name: mermaid
+      class: mermaid
+- pymdownx.tabbed:
+    alternate_style: true
+- toc:
+    toc_depth: 3
+    permalink: '#'
+- mdx_truly_sane_lists
+
+extra:
+  homepage: https://seamless_3dep.readthedocs.io
+  social:
+  - icon: fontawesome/brands/mastodon
+    link: https://mastodon.social/@taher
+  - icon: fontawesome/brands/linkedin
+    link: https://www.linkedin.com/in/tchegini
+  - icon: fontawesome/brands/github
+    link: https://github.com/cheginit
+
+nav:
+- Getting Started: README.md
+- Examples:
+  - Overview: examples/index.md
+  - Spline Interpolation: examples/dem.ipynb
+- API Reference: reference.md
+- Release Notes: CHANGELOG.md
+- Contributing: CONTRIBUTING.md
+plugins:
+- search
+- mkdocs-jupyter:
+    include: ['*.ipynb']
+    include_source: true
+- mkdocstrings:
+    default_handler: python
+    handlers:
+      python:
+        import:
+        - https://docs.python.org/3/objects.inv
+        - https://docs.xarray.dev/en/stable/objects.inv
+        - https://corteva.github.io/rioxarray/stable/objects.inv
+        - https://pyproj4.github.io/pyproj/stable/objects.inv
+        paths: [seamless_3dep]
+        options:
+          docstring_style: numpy
+          inherited_members: true
+          members_order: source
+          separate_signature: true
+          unwrap_annotated: false
+          filters:
+          - '!^_'
+          merge_init_into_class: true
+          docstring_section_style: list
+          signature_crossrefs: true
+          show_source: false
+hooks:
+- docs/docs_hooks.py
+
+extra_css:
+- stylesheets/extra.css

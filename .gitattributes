@@ -1,0 +1,4 @@
+# reduce the number of merge conflicts
+CHANGELOG.md merge=union
+# GitHub syntax highlighting
+pixi.lock linguist-language=YAML linguist-generated=true
