@@ -13,10 +13,48 @@
 ## Features
 
 SeamlessDEM is an open-source Python package that provides a simple and
-efficient way to retrieve digital elevation models (DEMs) from the
-[3D Elevation Program (3DEP)](https://www.usgs.gov/core-science-systems/ngp/3dep)
-at three different resolutions (1/3 arc-second, 1 arc-second, and 2 arc-second)
-and the [NASADEM](https://lpdaac.usgs.gov/products/nasadem_hgtv001/) at 1 arc-second resolution.
+efficient way to retrieve topographic maps from the
+[3D Elevation Program (3DEP)](https://www.usgs.gov/core-science-systems/ngp/3dep).
+This web service provides both dynamic and static elevation products.
+The static products are DEMs at three different resolutions
+(1/3 arc-second (10 m), 1 arc-second (30 m), and 2 arc-second (60 m)). The dynamic
+products are various elevation derivatives, such as hillshade, slope, aspect, and
+contours. Here's the full list of available products:
+
+- DEM
+- Hillshade Gray
+- Aspect Degrees
+- Aspect Map
+- GreyHillshade Elevation Fill
+- Hillshade Multidirectional
+- Slope Degrees
+- Slope Map
+- Hillshade Elevation Tinted
+- Height Ellipsoidal
+- Contour 25
+- Contour Smoothed 25
+
+SeamlessDEM has four functions:
+
+- `get_dem`: Retrieve DEM within a bounding box at any resolution. When the
+    give resolution is 10, 30, or 60, the function will return the static DEM.
+    This function, under the hood, decomposes the bounding box into smaller ones
+    based on the maximum pixel size of 10 million. Then, saves the DEM tiles
+    as GeoTIFF files and returns the file paths. The default resolution is 10.
+- `get_map`: Retrieve any of the map products within a bounding box at any
+    resolution. Similar to the `get_dem` function, this function returns the
+    file paths of the downloaded GeoTIFF files. The default resolution is 10.
+- `decompose_bbox`: Decompose a large bounding box into smaller based on maximum
+    pixel size. Both `get_dem` and `get_map` functions use this function to
+    decompose the bounding box into smaller ones with a default maximum pixel
+    size of 10 million.
+- `build_vrt`: Build a virtual raster file (VRT) from a list of raster files.
+    This function can be used to build a VRT file from the downloaded GeoTIFF files.
+    Note that GDAL must be installed to use this function which is an optional
+    dependency.
+
+Note that the input bounding box should be in the format of (west, south, east, north)
+in decimal degrees (WGS84).
 
 ## Installation
 
@@ -36,13 +74,34 @@ micromamba install -c conda-forge seamless-3dep
 
 ## Quick start
 
-Once HySetter is installed, you can use the CLI to subset hydroclimate
-data via a configuration file. The configuration file is a YAML file
-that specifies the data source, the area of interest (AOI), and the
-output directory. You can find an example configuration file in the
-[config_demo.yml](https://github.com/hyriver/seamless-3dep/blob/main/config_demo.yml).
+Here's a quick example to retrieve a DEM within a bounding box:
 
-![image](https://raw.githubusercontent.com/hyriver/seamless-3dep/main/hs_help.svg){.align-center}
+```python
+from pathlib import Path
+import seamless_3dep as sdem
+
+bbox = (-105.7006276, 39.8472777, -104.869054, 40.298293)
+data_dir = Path("data")
+tiff_files = sdem.get_dem(bbox, data_dir)
+if len(tiff_files) == 1:
+    dem_file = tiff_files[0]
+else:
+    dem_file = data_dir / "dem.vrt"
+    sdem.build_vrt(dem_file, tiff_files)
+dem = rxr.open_rasterio(dem_file).squeeze(drop=True)
+```
+
+![image](https://raw.githubusercontent.com/hyriver/seamless-3dep/main/docs/examples/images/dem.png)
+
+Now, let's get slope:
+
+```python
+tiff_files = sdem.get_map("Slope Degrees", bbox, data_dir)
+slope_dyn_vrt = data_dir / "slope_vrain_3dep_dynamic.vrt"
+sdem.build_vrt(slope_dyn_vrt, slope_files)
+```
+
+![image](https://raw.githubusercontent.com/hyriver/seamless-3dep/main/docs/examples/images/slope_dynamic.png)
 
 ## Contributing
 
