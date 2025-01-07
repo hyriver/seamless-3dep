@@ -34,7 +34,7 @@ repos:
     name: Sort top level statements with ssort
 
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.8.4
+  rev: v0.8.6
   hooks:
   - id: ruff
     name: Linting with Ruff
@@ -72,11 +72,11 @@ repos:
     args: [--autofix, --indent, '2']
 
 - repo: https://github.com/rhysd/actionlint
-  rev: v1.7.4
+  rev: v1.7.6
   hooks:
   - id: actionlint
     files: .github/workflows/
-    args: [-ignore, SC1090, -ignore, SC2046, -ignore, SC2086, -ignore, SC2129, -ignore, SC2155]
+    args: [-ignore, SC1090, -ignore, SC2046, -ignore, SC2086, -ignore, SC2129, -ignore, SC2155, -ignore, property "date"]
 
 - repo: https://github.com/executablebooks/mdformat
   rev: 0.7.21
