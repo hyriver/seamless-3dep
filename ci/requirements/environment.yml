@@ -1,0 +1,15 @@
+name: seamless_3dep-test
+channels:
+- conda-forge
+- nodefaults
+dependencies:
+# core
+- rasterio >=1.4.3
+# optional
+- gdal
+# tests
+- rioxarray
+- geopandas >=1
+- pywbt >=0.2.7
+- pytest-cov
+- pytest-sugar

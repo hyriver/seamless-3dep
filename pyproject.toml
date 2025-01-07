@@ -14,7 +14,7 @@ license = { text = "MIT" }
 authors = [
   { name = "Taher Chegini", email = "cheginit@gmail.com" },
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 classifiers = [
   "Development Status :: 4 - Beta",
   "Intended Audience :: Science/Research",
@@ -22,6 +22,7 @@ classifiers = [
   "Operating System :: OS Independent",
   "Programming Language :: Python",
   "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
@@ -35,6 +36,21 @@ dynamic = [
 ]
 dependencies = [
   "rasterio",
+]
+
+optional-dependencies.docs = [
+  "black",
+  "mdx-truly-sane-lists",
+  "mkdocs",
+  "mkdocs-jupyter",
+  "mkdocs-material",
+  "mkdocstrings-python",
+]
+optional-dependencies.test = [
+  "coverage[toml]",
+  "pytest",
+  "pytest-cov",
+  "pytest-sugar",
 ]
 urls.Changelog = "https://seamless-3dep.readthedocs.io/latest/CHANGELOG"
 urls.CI = "https://github.com/hyriver/seamless-3dep/actions"
@@ -50,7 +66,7 @@ packages = [
 ]
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py39"
 line-length = 100
 
 exclude = [ "__pycache__", "benchmarks" ]
@@ -141,7 +157,7 @@ lint.per-file-ignores."seamless_3dep/seamless_3dep.py" = [
   # specific type error ignored
   "PGH003",
 ]
-lint.per-file-ignores."seamless_3dep/tests/*.py" = [
+lint.per-file-ignores."tests/*.py" = [
   "D100",
   "D101",
   "D102",
@@ -215,77 +231,3 @@ reportUntypedFunctionDecorator = false
 reportAttributeAccessIssue = false
 reportInvalidTypeForm = false
 typeCheckingMode = "strict"
-
-[tool.pixi.feature.docs.tasks]
-build-docs = "mkdocs build --strict"
-docs = { cmd = [ "mkdocs", "serve" ], depends-on = [ "build-docs" ] }
-
-[tool.pixi.project]
-channels = [ "conda-forge", "pytorch" ]
-platforms = [ "linux-64", "osx-64", "osx-arm64", "win-64" ]
-
-[tool.pixi.pypi-dependencies]
-seamless_3dep = { path = ".", editable = true }
-
-[tool.pixi.feature.docs.pypi-dependencies]
-black = "*"
-mdx-truly-sane-lists = ">=1.3"
-mkdocs = ">=1.5.3"
-mkdocs-jupyter = "*"
-mkdocs-material = ">=9.5.20"
-mkdocstrings-python = "*"
-
-[tool.pixi.feature.dev.dependencies]
-# core dependencies
-rasterio = "*"
-# example dependencies
-rioxarray = "*"
-geopandas = ">=1"
-pywbt = ">=0.2.7"
-gdal = "*"
-# vscode dependencies
-ipykernel = "*"
-ipywidgets = "*"
-nbconvert = ">=7.16.4"
-notebook = ">=7.2.2"
-pytest = "*"
-
-[tool.pixi.feature.test.dependencies]
-coverage = "*"
-pytest-cov = "*"
-pytest-sugar = "*"
-
-[tool.pixi.feature.lint.dependencies]
-pre-commit = "*"
-codespell = "*"
-
-[tool.pixi.feature.typecheck.dependencies]
-pyright = "*"
-
-[tool.pixi.feature.py310.dependencies]
-python = "~=3.10.0"
-tomli = "*"
-
-[tool.pixi.feature.py313.dependencies]
-python = "~=3.13.0"
-
-[tool.pixi.environments]
-dev = { features = [ "dev", "py313" ] }
-test310 = { features = [ "test", "py310" ] }
-test313 = { features = [ "test", "py313" ] }
-typecheck = { features = [ "typecheck", "py313" ] }
-lint = { features = [ "lint", "py313" ], no-default-feature = true }
-docs = { features = [ "dev", "docs", "py313" ] }
-
-[tool.pixi.feature.test.tasks]
-test = "pytest --cov --junitxml=junit.xml"
-report = { cmd = [ "coverage", "report" ], depends-on = [ "test" ] }
-html = { cmd = [ "coverage", "html" ], depends-on = [ "report" ] }
-
-[tool.pixi.feature.lint.tasks]
-lint = "pre-commit run --all-files"
-pcupdate = "pre-commit autoupdate"
-spell = "codespell -w"
-
-[tool.pixi.feature.typecheck.tasks]
-typecheck = "pyright"

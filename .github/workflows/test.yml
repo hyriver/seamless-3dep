@@ -17,27 +17,45 @@ concurrency:
 
 jobs:
   test:
-    name: python ${{ matrix.environment }}, ${{ matrix.os }}
+    name: python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    env:
+      REPO_NAME: ${{ github.event.repository.name }}
     defaults:
       run:
         shell: bash -l {0}
     strategy:
       matrix:
+        python-version: [3.9, '3.12']
         os: [ubuntu-latest, macos-latest, windows-latest]
-        environment: [test310, test312]
 
     steps:
     - uses: actions/checkout@v4
-    - uses: prefix-dev/setup-pixi@v0.8.1
+    - name: Set environment variables
+      run: |-
+        echo "PYTHON_VERSION=${{ matrix.python-version }}" >> $GITHUB_ENV
+    - name: Setup micromamba
+      uses: mamba-org/setup-micromamba@v2
+      env:
+        DATE: ${{ steps.date.outputs.time }}
       with:
-        pixi-version: v0.39.2
-        environments: ${{ matrix.environment }}
-        cache: true
-        cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
-    - name: Run pixi
-      run: pixi r -e ${{ matrix.environment }} test
-
+        environment-file: ci/requirements/environment.yml
+        environment-name: ${{ env.REPO_NAME }}-tests
+        create-args: >-
+          python=${{ matrix.python-version }}
+        post-cleanup: all
+        cache-environment: true
+        cache-environment-key: ${{runner.os}}-${{runner.arch}}-py${{matrix.python-version}}-${{env.DATE}}
+    - name: Install error reporter
+      if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+      run: |
+        python -m pip install pytest-github-actions-annotate-failures
+    - name: Install the package
+      run: |-
+        python -m pip install --no-deps .
+    - name: Run pytest
+      run: |-
+        pytest --cov --junitxml=junit.xml
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v5
       with:

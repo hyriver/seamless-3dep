@@ -1,0 +1,20 @@
+name: seamless_3dep-dev
+channels:
+- conda-forge
+- nodefaults
+dependencies:
+- python >=3.9
+# core
+- rasterio >=1.4.3
+# optional
+- gdal
+# notebooks
+- rioxarray
+- geopandas >=1
+- pywbt >=0.2.7
+# IDE
+- ipykernel
+- ipywidgets
+- nbconvert >=7.16.4
+- notebook >=7.2.2
+- pytest
