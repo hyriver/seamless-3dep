@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from importlib.metadata import PackageNotFoundError, version
 
-from seamless_3dep.seamless_3dep import decompose_bbox, get, build_vrt
+from seamless_3dep.seamless_3dep import build_vrt, decompose_bbox, get_dem, get_map
 
 try:
     __version__ = version("seamless_3dep")
@@ -13,7 +13,8 @@ except PackageNotFoundError:
 
 __all__ = [
     "__version__",
-    "decompose_bbox",
-    "get",
     "build_vrt",
+    "decompose_bbox",
+    "get_dem",
+    "get_map",
 ]
