@@ -1,6 +1,6 @@
 <!-- omit in toc -->
 
-# Contributing to CatSmoothing
+# Contributing to Seamless3DEP
 
 First off, thanks for taking the time to contribute! ❤️
 
@@ -26,13 +26,13 @@ All types of contributions are encouraged and valued. See the [Table of Contents
 
 ## I Have a Question
 
-> If you want to ask a question, we assume that you have read the available [Documentation](https://cheginit.github.io/catsmoothing).
+> If you want to ask a question, we assume that you have read the available [Documentation](https://cheginit.github.io/seamless_3dep).
 
-Before you ask a question, it is best to search for existing [Issues](https://github.com/cheginit/catsmoothing/issues) that might help you. In case you have found a suitable issue and still need clarification, you can write your question in this issue. It is also advisable to search the internet for answers first.
+Before you ask a question, it is best to search for existing [Issues](https://github.com/hyriver/seamless-3dep/issues) that might help you. In case you have found a suitable issue and still need clarification, you can write your question in this issue. It is also advisable to search the internet for answers first.
 
 If you then still feel the need to ask a question and need clarification, we recommend the following:
 
-- Open an [Issue](https://github.com/cheginit/catsmoothing/issues/new).
+- Open an [Issue](https://github.com/hyriver/seamless-3dep/issues/new).
 - Provide as much context as you can about what you're running into.
 - Provide project and platform versions (`python`, `pixi`, etc), depending on what seems relevant.
 
@@ -53,8 +53,8 @@ We will then take care of the issue as soon as possible.
 A good bug report shouldn't leave others needing to chase you up for more information. Therefore, we ask you to investigate carefully, collect information and describe the issue in detail in your report. Please complete the following steps in advance to help us fix any potential bug as fast as possible.
 
 - Make sure that you are using the latest version.
-- Determine if your bug is really a bug and not an error on your side e.g. using incompatible environment components/versions (Make sure that you have read the [documentation](https://cheginit.github.io/catsmoothing). If you are looking for support, you might want to check [this section](#i-have-a-question)).
-- To see if other users have experienced (and potentially already solved) the same issue you are having, check if there is not already a bug report existing for your bug or error in the [bug tracker](https://github.com/cheginit/pywbtissues?q=label%3Abug).
+- Determine if your bug is really a bug and not an error on your side e.g. using incompatible environment components/versions (Make sure that you have read the [documentation](https://cheginit.github.io/seamless_3dep). If you are looking for support, you might want to check [this section](#i-have-a-question)).
+- To see if other users have experienced (and potentially already solved) the same issue you are having, check if there is not already a bug report existing for your bug or error in the [bug tracker](https://github.com/hyriver/pywbtissues?q=label%3Abug).
 - Also make sure to search the internet (including Stack Overflow) to see if users outside of the GitHub community have discussed the issue.
 - Collect information about the bug:
     - Stack trace (Traceback)
@@ -71,7 +71,7 @@ A good bug report shouldn't leave others needing to chase you up for more inform
 
 We use GitHub issues to track bugs and errors. If you run into an issue with the project:
 
-- Open an [Issue](https://github.com/cheginit/catsmoothing/issues/new). (Since we can't be sure at this point whether it is a bug or not, we ask you not to talk about a bug yet and not to label the issue.)
+- Open an [Issue](https://github.com/hyriver/seamless-3dep/issues/new). (Since we can't be sure at this point whether it is a bug or not, we ask you not to talk about a bug yet and not to label the issue.)
 - Explain the behavior you would expect and the actual behavior.
 - Please provide as much context as possible and describe the *reproduction steps* that someone else can follow to recreate the issue on their own. This usually includes your code. For good bug reports you should isolate the problem and create a reduced test case.
 - Provide the information you collected in the previous section.
@@ -84,54 +84,107 @@ Once it's filed:
 
 ### Suggesting Enhancements
 
-This section guides you through submitting an enhancement suggestion for CatSmoothing, **including completely new features and minor improvements to existing functionality**. Following these guidelines will help maintainers and the community to understand your suggestion and find related suggestions.
+This section guides you through submitting an enhancement suggestion for Seamless3DEP, **including completely new features and minor improvements to existing functionality**. Following these guidelines will help maintainers and the community to understand your suggestion and find related suggestions.
 
 <!-- omit in toc -->
 
 #### Before Submitting an Enhancement
 
 - Make sure that you are using the latest version.
-- Read the [documentation](https://cheginit.github.io/catsmoothing) carefully and find out if the functionality is already covered, maybe by an individual configuration.
-- Perform a [search](https://github.com/cheginit/catsmoothing/issues) to see if the enhancement has already been suggested. If it has, add a comment to the existing issue instead of opening a new one.
+- Read the [documentation](https://cheginit.github.io/seamless_3dep) carefully and find out if the functionality is already covered, maybe by an individual configuration.
+- Perform a [search](https://github.com/hyriver/seamless-3dep/issues) to see if the enhancement has already been suggested. If it has, add a comment to the existing issue instead of opening a new one.
 - Find out whether your idea fits with the scope and aims of the project. It's up to you to make a strong case to convince the project's developers of the merits of this feature. Keep in mind that we want features that will be useful to the majority of our users and not just a small subset. If you're just targeting a minority of users, consider writing an add-on/plugin library.
 
 <!-- omit in toc -->
 
 #### How Do I Submit a Good Enhancement Suggestion?
 
-Enhancement suggestions are tracked as [GitHub issues](https://github.com/cheginit/catsmoothing/issues).
+Enhancement suggestions are tracked as [GitHub issues](https://github.com/hyriver/seamless-3dep/issues).
 
 - Use a **clear and descriptive title** for the issue to identify the suggestion.
 - Provide a **step-by-step description of the suggested enhancement** in as many details as possible.
 - **Describe the current behavior** and **explain which behavior you expected to see instead** and why. At this point you can also tell which alternatives do not work for you.
-- **Explain why this enhancement would be useful** to most CatSmoothing users. You may also want to point out the other projects that solved it better and which could serve as inspiration.
+- **Explain why this enhancement would be useful** to most Seamless3DEP users. You may also want to point out the other projects that solved it better and which could serve as inspiration.
 
 ### Your First Code Contribution
 
-For this project we use [Pixi](https://pixi.sh/latest/). Please follow in the installation
-instructions in the its documentation based on your platform. Once you have installed Pixi,
-you need to initialize the project by running the following command in the root directory of the project:
+Ready to contribute? Here's how to set up Seamless3DEP for local development.
 
-```bash
-pixi install
+1. Fork the Seamless3DEP repo through the GitHub website.
+
+1. Clone your fork locally and add the main `seamless-3dep` as the upstream remote:
+
+    ```console
+    git clone git@github.com:your_name_here/seamless-3dep.git
+    git remote add upstream git@github.com:hyriver/seamless-3dep.git
+    ```
+
+1. Install your local copy into a virtualenv. Assuming you have `micromamba` installed,
+    this is how you can set up your fork for local development:
+
+    ```console
+    cd seamless-3dep/
+    mamba env create -f ci/requirements/environment-dev.yml
+    mamba activate seamless-3dep-dev
+    python -m pip install . --no-deps
+    ```
+
+1. Create a branch for local development:
+
+    ```console
+    git checkout -b bugfix-or-feature/name-of-your-bugfix-or-feature
+    git push
+    ```
+
+1. Now you can make your changes locally, make sure to add a description of the changes to `HISTORY.rst` file and add extra tests, if applicable, to `tests` folder. Also, make sure to give yourself credit by adding your name at the end of the item(s) that you add in the history like this `By Taher Chegini <https://github.com/hyriver>`. Then, fetch the latest updates from the remote and resolve any merge conflicts:
+
+    ```console
+    git fetch upstream
+    git merge upstream/name-of-your-branch
+    ```
+
+1. Then create a new environment for linting and another for testing:
+
+    ```console
+    mamba create -n py11 python=3.11 nox tomli pre-commit codespell gdal
+    mamba activate py11
+    nox -s pre-commit
+    nox -s type-check
+    mamba create -n py38 python=3.8 nox tomli pre-commit codespell gdal
+    mamba activate py38
+    nox -s tests
+    ```
+
+    Note that if Python 3.11 is already installed on your system, you can skip creating the `py11` environment and just use your system's Python 3.11 to run the linting and type-checking tests, like this:
+
+    ```console
+    mamba create -n py38 python=3.8 nox tomli pre-commit codespell gdal
+    mamba activate py38
+    nox
+    ```
+
+1. If you are making breaking changes make sure to reflect them in the documentation, `README.rst`, and tests if necessary.
+
+1. Commit your changes and push your branch to GitHub. Start the commit message with `ENH:`, `BUG:`, `DOC:` to indicate whether the commit is a new feature, documentation related, or a bug fix. For example:
+
+    ```console
+    git add .
+    git commit -m "ENH: A detailed description of your changes."
+    git push origin name-of-your-branch
+    ```
+
+1. Submit a pull request through the GitHub website.
+
+Note that to run a subset of tests you can use:
+
+```console
+nox -s tests -- -n=1 -k "test_name1 or test_name2"
 ```
-
-This will install all the necessary dependencies for the project. Once you make changes
-to the project, there are six steps that you need to follow:
-
-1. Add tests for your changes either in `tests/test_catsmoothing.py` file or
-    create a new file in the `tests` directory with the name `test_<module_name>.py`.
-1. Run `pixi r -e test310` and `pixi r -e test313` to run the tests.
-1. Run `pixi lint` for auto-formatting and to check any linting errors.
-1. Run `pixi r typecheck` to check for type errors.
-1. Document your changes in the `CHANGELOG.md` file. Please make sure to
-    include any associated issue numbers, if applicable, and your GitHub username.
-1. Commit your changes using the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification and create a pull request.
 
 ### Improving The Documentation
 
-CatSmoothing could always use more documentation, whether as part of the
-official CatSmoothing docs, in docstrings, or even on the web in blog posts,
+Seamless3DEP could always use more documentation, whether as part of the
+official Seamless3DEP docs, in docstrings, or even on the web in blog posts,
 articles, and such.
 
 <!-- omit in toc -->
