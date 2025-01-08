@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import nox
 
-
-py310 = ["3.10"]
+py39 = ["3.9"]
 py313 = ["3.13"]
 nox.options.sessions = (
     "pre-commit",
@@ -41,7 +40,7 @@ def spell(session: nox.Session) -> None:
     session.run("codespell", "-w", *session.posargs)
 
 
-@nox.session(name="type-check", python=py310)
+@nox.session(name="type-check", python=py313)
 def type_check(session: nox.Session) -> None:
     """Run Pyright."""
     session.install(".")
@@ -49,12 +48,12 @@ def type_check(session: nox.Session) -> None:
     session.run("pyright")
 
 
-@nox.session(python=py310, venv_backend="micromamba")
+@nox.session(python=py39, venv_backend="micromamba")
 def tests(session: nox.Session) -> None:
     """Run the test suite."""
     session.conda_install("gdal", channel="conda-forge")
     session.install(".[test]")
-    session.run("pytest", "--cov-branch", "--cov-report=xml", *session.posargs)
+    session.run("pytest", *session.posargs)
     session.notify("cover")
 
 

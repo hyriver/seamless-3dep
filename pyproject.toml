@@ -185,7 +185,7 @@ skip = "__pycache__,_build,.mypy_cache,.git,./htmlcov,.pixi,pixi.lock,**.ipynb"
 ignore-words-list = "gage,gages"
 
 [tool.pytest.ini_options]
-addopts = "-v --cov --junitxml=junit.xml --durations=5"
+addopts = "-v --cov-branch --cov-report=xml --durations=5"
 doctest_optionflags = 'NORMALIZE_WHITESPACE IGNORE_EXCEPTION_DETAIL NUMBER'
 testpaths = [
   "tests",
