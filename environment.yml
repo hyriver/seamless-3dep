@@ -1,0 +1,14 @@
+name: binder
+channels:
+- conda-forge
+- nodefaults
+dependencies:
+- python >=3.9
+# core
+- rasterio >=1.4.3
+# optional
+- gdal
+# notebooks
+- rioxarray
+- geopandas >=1
+- pywbt >=0.2.7
