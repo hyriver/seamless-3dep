@@ -53,7 +53,7 @@ def type_check(session: nox.Session) -> None:
 def tests(session: nox.Session) -> None:
     """Run the test suite."""
     session.install(".[test]")
-    session.run("pytest", "--cov", "--junitxml=junit.xml", *session.posargs)
+    session.run("pytest", "--cov-branch", "--cov-report=xml", *session.posargs)
     session.notify("cover")
 
 
