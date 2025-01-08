@@ -49,9 +49,10 @@ def type_check(session: nox.Session) -> None:
     session.run("pyright")
 
 
-@nox.session(python=py310)
+@nox.session(python=py310, venv_backend="micromamba")
 def tests(session: nox.Session) -> None:
     """Run the test suite."""
+    session.conda_install("gdal", channel="conda-forge")
     session.install(".[test]")
     session.run("pytest", "--cov-branch", "--cov-report=xml", *session.posargs)
     session.notify("cover")
