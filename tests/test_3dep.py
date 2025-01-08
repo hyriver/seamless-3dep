@@ -1,5 +1,8 @@
 import pytest
-from seamless_3dep import decompose_bbox
+import shutil
+from pathlib import Path
+import seamless_3dep as sdem
+import rasterio
 
 
 @pytest.fixture
@@ -16,7 +19,7 @@ def pixel_max() -> int:
 
 def test_decompose_bbox_no_division(valid_bbox: tuple[float, float, float, float], small_resolution: int, pixel_max: int):
     """Test when bbox is small enough to not require division."""
-    boxes, *_ = decompose_bbox(valid_bbox, small_resolution, pixel_max * 100)
+    boxes, *_ = sdem.decompose_bbox(valid_bbox, small_resolution, pixel_max * 100)
     assert len(boxes) == 1
     assert boxes[0] == valid_bbox
 
@@ -24,7 +27,7 @@ def test_decompose_bbox_with_division(valid_bbox: tuple[float, float, float, flo
     """Test when bbox needs to be divided."""
     # Use small pixel_max to force division
     small_pixel_max = 1000
-    boxes, *_ = decompose_bbox(valid_bbox, 30.0, small_pixel_max)
+    boxes, *_ = sdem.decompose_bbox(valid_bbox, 30.0, small_pixel_max)
     assert len(boxes) > 1
     
     # Check that all boxes are within original bbox
@@ -39,7 +42,7 @@ def test_decompose_bbox_with_division(valid_bbox: tuple[float, float, float, flo
 def test_decompose_bbox_with_buffer():
     """Test decompose_bbox with buffer."""
     bbox = (-122.0, 37.0, -121.0, 38.0)
-    boxes, *_ = decompose_bbox(
+    boxes, *_ = sdem.decompose_bbox(
         bbox, 
         resolution=30.0,
         pixel_max=1000,
@@ -60,12 +63,12 @@ def test_decompose_bbox_invalid_resolution():
     """Test decompose_bbox with resolution larger than bbox dimension."""
     bbox = (-122.001, 37.001, -122.0, 37.002)  # Very small bbox
     with pytest.raises(ValueError):
-        decompose_bbox(bbox, resolution=10000.0, pixel_max=1000)
+        sdem.decompose_bbox(bbox, resolution=10000.0, pixel_max=1000)
 
 def test_decompose_bbox_aspect_ratio():
     """Test that decomposed boxes maintain approximate aspect ratio."""
     bbox = (-122.0, 37.0, -121.0, 38.0)
-    boxes, *_ = decompose_bbox(
+    boxes, *_ = sdem.decompose_bbox(
         bbox,
         resolution=30.0,
         pixel_max=1000
@@ -88,7 +91,7 @@ def test_decompose_bbox_aspect_ratio():
 def test_decompose_bbox_coverage():
     """Test that decomposed boxes cover the entire original bbox."""
     bbox = (-122.0, 37.0, -121.0, 38.0)
-    boxes, *_ = decompose_bbox(
+    boxes, *_ = sdem.decompose_bbox(
         bbox,
         resolution=30.0,
         pixel_max=1000
@@ -111,3 +114,31 @@ def test_decompose_bbox_coverage():
         (round(orig_east, 6), round(orig_north, 6))
     }
     assert orig_points.issubset(points_covered)
+
+
+def test_dem():
+    bbox = (-121.1, 37.9, -121.0, 38.0)
+    tiff_files = sdem.get_dem(bbox, "dem_data", 30)
+    tiff_files[0].unlink()
+    tiff_files = sdem.get_dem(bbox, "dem_data", 30, None)
+    with rasterio.open(tiff_files[0]) as src:
+        assert src.shape == (359, 359)
+    tiff_files = sdem.get_dem(bbox, "dem_data", 30, 80000)
+    with rasterio.open(tiff_files[0]) as src:
+        assert src.shape == (359, 179)
+    vrt_file = Path("dem_data", "dem.vrt")
+    sdem.build_vrt(vrt_file, tiff_files)
+    assert vrt_file.stat().st_size == 1701
+    shutil.rmtree("dem_data", ignore_errors=True)
+
+
+def test_3dep():
+    bbox = (-121.1, 37.9, -121.0, 38.0)
+    tiff_files = sdem.get_map("Slope Degrees", bbox, "slope_data", 30, None)
+    tiff_files = sdem.get_map("Slope Degrees", bbox, "slope_data", 30)
+    with rasterio.open(tiff_files[0]) as src:
+        assert src.shape == (371, 293)
+    tiff_files = sdem.get_map("Slope Degrees", bbox, "slope_data", 30, 80000)
+    with rasterio.open(tiff_files[0]) as src:
+        assert src.shape == (371, 147)
+    shutil.rmtree("slope_data", ignore_errors=True)
