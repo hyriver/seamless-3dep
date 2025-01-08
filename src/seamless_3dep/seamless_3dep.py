@@ -8,9 +8,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from collections.abc import Sequence
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
-from itertools import repeat
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
@@ -35,7 +34,7 @@ if TYPE_CHECKING:
 
 __all__ = ["build_vrt", "decompose_bbox", "get_dem", "get_map"]
 
-MAX_PIXELS = 10_000_000
+MAX_PIXELS = 8_000_000
 
 
 class DownloadError(Exception):
@@ -90,8 +89,8 @@ def _haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> f
 
 def decompose_bbox(
     bbox: tuple[float, float, float, float],
-    resolution: float,
-    pixel_max: int,
+    res: int,
+    pixel_max: int | None = MAX_PIXELS,
     buff_npixels: float = 0.0,
 ) -> tuple[list[tuple[float, float, float, float]], int, int]:
     """Divide a Bbox into equal-area sub-bboxes based on pixel count.
@@ -100,10 +99,11 @@ def decompose_bbox(
     ----------
     bbox : tuple
         Bounding box coordinates in decimal degrees like so: (west, south, east, north).
-    resolution : float
+    res : int
         Resolution of the domain in meters.
-    pixel_max : int
-        Maximum number of pixels allowed in each sub-bbox.
+    pixel_max : int, optional
+        Maximum number of pixels allowed in each sub-bbox. If None, the bbox
+        is not decomposed. Defaults to 8 million.
     buff_npixels : float, optional
         Number of pixels to buffer each sub-bbox by, defaults to 0.
 
@@ -121,11 +121,13 @@ def decompose_bbox(
     x_dist = _haversine_distance(south, west, south, east)
     y_dist = _haversine_distance(south, west, north, west)
 
-    if resolution > min(x_dist, y_dist):
+    if res > min(x_dist, y_dist):
         raise ValueError("Resolution must be less than the smallest dimension of the bbox.")
 
-    width = math.ceil(x_dist / resolution)
-    height = math.ceil(y_dist / resolution)
+    width = math.ceil(x_dist / res)
+    height = math.ceil(y_dist / res)
+    if pixel_max is None or width * height <= pixel_max:
+        return [bbox], width, height
 
     # Divisions in each direction maintaining aspect ratio
     aspect_ratio = width / height
@@ -140,9 +142,6 @@ def decompose_bbox(
     sub_height = math.ceil(height / ny)
     buff_x = dx * (buff_npixels / sub_width)
     buff_y = dy * (buff_npixels / sub_height)
-
-    if width * height <= pixel_max:
-        return [bbox], sub_width, sub_height
 
     boxes = []
     for i in range(nx):
@@ -176,25 +175,36 @@ def _clip_3dep(vrt_url: str, box: tuple[float, float, float, float], tiff_path: 
                 dst.write(data)
 
 
-def _static_dem(
+def _create_hash(box: tuple[float, float, float, float], res: int, crs: int) -> str:
+    """Create a hash from bbox, resolution, and CRS."""
+    return hashlib.sha256(",".join(map(str, [*box, res, crs])).encode()).hexdigest()
+
+
+def get_dem(
     bbox: tuple[float, float, float, float],
     save_dir: str | Path,
-    resolution: Literal[10, 30, 60] = 10,
+    res: Literal[10, 30, 60] = 10,
     pixel_max: int | None = MAX_PIXELS,
 ) -> list[Path]:
     """Get DEM from 3DEP at 10, 30, or 60 meters resolutions.
 
+    Notes
+    -----
+    If you need a different resolution, use the ``get_map`` function
+    with ``map_type="DEM"``.
+
     Parameters
     ----------
     bbox : tuple
-        Bounding box coordinates in decimal degrees like so: (west, south, east, north).
+        Bounding box coordinates in decimal degrees: (west, south, east, north).
     save_dir : str or pathlib.Path
         Path to save the GeoTiff files.
-    resolution : int, optional
-        Resolution of the DEM in meters, by default 10. Must be one of 10, 30, or 60.
+    res : {10, 30, 60}, optional
+        Target resolution of the DEM in meters, by default 10.
+        Must be one of 10, 30, or 60.
     pixel_max : int, optional
-        Maximum number of pixels allowed in decomposing the bbox into equal-area sub-bboxes,
-        by default MAX_PIXELS. If ``None``, the bbox is not decomposed.
+        Maximum number of pixels allowed in decomposing the bbox into equal-area
+        sub-bboxes, by default 8 million. If ``None``, the bbox is not decomposed.
 
     Returns
     -------
@@ -207,31 +217,18 @@ def _static_dem(
         30: f"{base_url}/1/TIFF/USGS_Seamless_DEM_1.vrt",
         60: f"{base_url}/2/TIFF/USGS_Seamless_DEM_2.vrt",
     }
-    if resolution not in url:
-        raise ValueError("Resolution must be one of 10, 30, or 60 meters.")
+    if res not in url:
+        raise ValueError("`res` must be one of 10, 30, or 60 meters.")
 
-    if pixel_max is None:
-        _check_bbox(bbox)
-        west, south, east, north = bbox
-        x_dist = _haversine_distance(south, west, south, east)
-        y_dist = _haversine_distance(south, west, north, west)
+    bbox_list, _, _ = decompose_bbox(bbox, res, pixel_max)
 
-        if resolution > min(x_dist, y_dist):
-            raise ValueError("Resolution must be less than the smallest dimension of the bbox.")
-        bbox_list = [bbox]
-    else:
-        bbox_list, _, _ = decompose_bbox(bbox, resolution, pixel_max)
-
-    vrt_url = url[resolution]
+    vrt_url = url[res]
     _check_bounds(bbox, _get_bounds(vrt_url))
 
     save_dir = Path(save_dir)
     save_dir.mkdir(parents=True, exist_ok=True)
 
-    tiff_list = [
-        save_dir / f"dem_{hashlib.sha256(','.join(map(str, box)).encode()).hexdigest()}.tiff"
-        for box in bbox_list
-    ]
+    tiff_list = [save_dir / f"dem_{_create_hash(box, res, 4326)}.tiff" for box in bbox_list]
     if all(tiff.exists() for tiff in tiff_list):
         return tiff_list
 
@@ -240,30 +237,34 @@ def _static_dem(
         _clip_3dep(vrt_url, bbox_list[0], tiff_list[0])
     else:
         with ThreadPoolExecutor(max_workers=n_jobs) as executor:
-            executor.map(
-                lambda args: _clip_3dep(*args),
-                zip(repeat(vrt_url), bbox_list, tiff_list),
-            )
+            future_to_url = {
+                executor.submit(_clip_3dep, vrt_url, box, path): (box, path)
+                for box, path in zip(bbox_list, tiff_list)
+            }
+            for future in as_completed(future_to_url):
+                url = future_to_url[future]
+                try:
+                    future.result()
+                except Exception as e:
+                    raise DownloadError(vrt_url, e) from e
     return tiff_list
 
 
 def _get_map(url: str, tiff_path: Path) -> None:
     """Call 3DEP's REST API to get the map and save it as a GeoTiff file."""
-    try:
-        if tiff_path.exists():
-            with urllib.request.urlopen(urllib.request.Request(url, method="HEAD")) as response:
-                if tiff_path.stat().st_size == int(response.headers["Content-Length"]):
-                    return
-        urllib.request.urlretrieve(url, tiff_path)
-    except (urllib.error.URLError, urllib.error.HTTPError) as e:
-        raise DownloadError(url, e) from e
+    if tiff_path.exists():
+        with urllib.request.urlopen(urllib.request.Request(url, method="HEAD")) as r:
+            if tiff_path.stat().st_size == int(r.headers["Content-Length"]):
+                return
+    urllib.request.urlretrieve(url, tiff_path)
 
 
 def get_map(
     map_type: MapTypes,
     bbox: tuple[float, float, float, float],
     save_dir: str | Path,
-    resolution: int = 10,
+    res: int = 10,
+    out_crs: int = 5070,
     pixel_max: int | None = MAX_PIXELS,
 ) -> list[Path]:
     """Get topo maps within US from 3DEP at any resolution.
@@ -272,18 +273,32 @@ def get_map(
     ----------
     map_type : MapTypes
         Type of map to get. Must be one of the following:
-        'DEM', 'Hillshade Gray', 'Aspect Degrees', 'Aspect Map', 'GreyHillshade_elevationFill',
-        'Hillshade Multidirectional', 'Slope Map', 'Slope Degrees', 'Hillshade Elevation Tinted',
-        'Height Ellipsoidal', 'Contour 25', 'Contour Smoothed 25'.
+
+        - ``'DEM'``
+        - ``'Hillshade Gray'``
+        - ``'Aspect Degrees'``
+        - ``'Aspect Map'``
+        - ``'GreyHillshade_elevationFill'``
+        - ``'Hillshade Multidirectional'``
+        - ``'Slope Map'``
+        - ``'Slope Degrees'``
+        - ``'Hillshade Elevation Tinted'``
+        - ``'Height Ellipsoidal'``
+        - ``'Contour 25'``
+        - ``'Contour Smoothed 25'``
     bbox : tuple
-        Bounding box coordinates in decimal degrees like so: (west, south, east, north).
+        Bounding box coordinates in decimal degrees (WG84): (west, south, east, north).
     save_dir : str or pathlib.Path
         Path to save the GeoTiff files.
-    resolution : int, optional
-        Resolution of the DEM in meters, by default 10.
+    res : int, optional
+        Target resolution of the map in meters, by default 10.
+    out_crs : int, optional
+        Coordinate reference system of the output GeoTiff, by default 5070. This must
+        be a well-known ID (WKID) like 3857 or 5070. Do not use 4326 since at the moment
+        the 3DEP web service does not return correct results.
     pixel_max : int, optional
-        Maximum number of pixels allowed in decomposing the bbox into equal-area sub-bboxes,
-        by default MAX_PIXELS. If ``None``, the bbox is not decomposed.
+        Maximum number of pixels allowed in decomposing the bbox into equal-area
+        sub-bboxes, by default 8 million. If ``None``, the bbox is not decomposed.
 
     Returns
     -------
@@ -307,38 +322,28 @@ def get_map(
     if map_type not in valid_types:
         raise ValueError(f"`map_type` must be one of {valid_types}.")
 
-    if map_type == "DEM" and resolution in (10, 30, 60):
-        return _static_dem(bbox, save_dir, resolution, pixel_max)
+    if not isinstance(out_crs, int):
+        raise TypeError("`out_crs` must be an integer representing WKID.")
 
-    if pixel_max is None:
-        _check_bbox(bbox)
-        west, south, east, north = bbox
-        x_dist = _haversine_distance(south, west, south, east)
-        y_dist = _haversine_distance(south, west, north, west)
+    if out_crs == 4326:
+        msg = "`out_crs` cannot be 4326 since 3DEP does not return correct results."
+        msg += " Use a different CRS like 3857 or 5070."
+        raise ValueError(msg)
 
-        if resolution > min(x_dist, y_dist):
-            raise ValueError("Resolution must be less than the smallest dimension of the bbox.")
+    bbox_list, sub_width, sub_height = decompose_bbox(bbox, res, pixel_max)
 
-        sub_width = math.ceil(x_dist / resolution)
-        sub_height = math.ceil(y_dist / resolution)
-        bbox_list = [bbox]
-    else:
-        bbox_list, sub_width, sub_height = decompose_bbox(bbox, resolution, pixel_max)
     _check_bounds(bbox, (-180.0, -15.0, 180.0, 84.0))
-
     save_dir = Path(save_dir)
     save_dir.mkdir(parents=True, exist_ok=True)
 
-    op_name = map_type.replace(" ", "_").lower()
-    tiff_list = [
-        save_dir / f"{op_name}_{hashlib.sha256(','.join(map(str, box)).encode()).hexdigest()}.tiff"
-        for box in bbox_list
-    ]
+    rule = map_type.replace(" ", "_").lower()
+    tiff_list = [save_dir / f"{rule}_{_create_hash(box, res, out_crs)}.tiff" for box in bbox_list]
     if all(tiff.exists() for tiff in tiff_list):
         return tiff_list
 
     params = {
-        "bboxSR": "4326",
+        "bboxSR": 4326,
+        "imageSR": out_crs,
         "size": ",".join(map(str, (sub_width, sub_height))),
         "format": "tiff",
         "interpolation": "RSP_BilinearInterpolation",
@@ -350,7 +355,7 @@ def get_map(
     url = "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage"
     url_list = []
     for box in bbox_list:
-        params["bbox"] = ",".join(map(str, box))
+        params["bbox"] = ",".join(str(round(c, 6)) for c in box)
         url_list.append(f"{url}?{urllib.parse.urlencode(params)}")
 
     n_jobs = min(4, len(url_list))
@@ -358,42 +363,22 @@ def get_map(
         _get_map(url_list[0], tiff_list[0])
     else:
         with ThreadPoolExecutor(max_workers=n_jobs) as executor:
-            executor.map(lambda args: _get_map(*args), zip(url_list, tiff_list))
+            future_to_url = {
+                executor.submit(_get_map, url, path): url for url, path in zip(url_list, tiff_list)
+            }
+            for future in as_completed(future_to_url):
+                url = future_to_url[future]
+                try:
+                    future.result()
+                except urllib.error.HTTPError as e:
+                    raise DownloadError(url, e) from e
     return tiff_list
-
-
-def get_dem(
-    bbox: tuple[float, float, float, float],
-    save_dir: str | Path,
-    resolution: int = 10,
-    pixel_max: int | None = MAX_PIXELS,
-) -> list[Path]:
-    """Get DEM from 3DEP at any resolution.
-
-    Parameters
-    ----------
-    bbox : tuple
-        Bounding box coordinates in decimal degrees like so: (west, south, east, north).
-    save_dir : str or pathlib.Path
-        Path to save the GeoTiff files.
-    resolution : int, optional
-        Resolution of the DEM in meters, by default 10.
-    pixel_max : int, optional
-        Maximum number of pixels allowed in decomposing the bbox into equal-area sub-bboxes,
-        by default MAX_PIXELS. If ``None``, the bbox is not decomposed.
-
-    Returns
-    -------
-    list of pathlib.Path
-        list of GeoTiff files containing the DEM clipped to the bounding box.
-    """
-    return get_map("DEM", bbox, save_dir, resolution, pixel_max)
 
 
 def build_vrt(
     vrt_path: str | Path, tiff_files: list[str] | list[Path], relative: bool = False
 ) -> None:
-    """Create a VRT from tiles.
+    """Create a VRT from a list of GeoTIFF tiles.
 
     Notes
     -----
