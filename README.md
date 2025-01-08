@@ -1,4 +1,4 @@
-# SeamlessDEM: DEM Retrieval from 3DEP or NASADEM
+# Seamless3DEP: Topographic Maps retrieval from 3DEP
 
 [![PyPi](https://img.shields.io/pypi/v/seamless-3dep.svg)](https://pypi.python.org/pypi/seamless-3dep)
 [![Conda Version](https://img.shields.io/conda/vn/conda-forge/seamless-3dep.svg)](https://anaconda.org/conda-forge/seamless-3dep)
@@ -12,7 +12,7 @@
 
 ## Features
 
-SeamlessDEM is an open-source Python package that provides a simple and
+Seamless3DEP is an open-source Python package that provides a simple and
 efficient way to retrieve topographic maps from the
 [3D Elevation Program (3DEP)](https://www.usgs.gov/core-science-systems/ngp/3dep).
 This web service provides both dynamic and static elevation products.
@@ -34,7 +34,7 @@ contours. Here's the full list of available products:
 - Contour 25
 - Contour Smoothed 25
 
-SeamlessDEM has four functions:
+Seamless3DEP has four functions:
 
 - `get_dem`: Retrieve DEM within a bounding box at any resolution. When the
     give resolution is 10, 30, or 60, the function will return the static DEM.
