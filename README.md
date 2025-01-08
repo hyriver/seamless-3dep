@@ -39,7 +39,7 @@ Seamless3DEP has four functions:
 - `get_dem`: Retrieve DEM within a bounding box at any resolution. When the
     give resolution is 10, 30, or 60, the function will return the static DEM.
     This function, under the hood, decomposes the bounding box into smaller ones
-    based on the maximum pixel size of 10 million. Then, saves the DEM tiles
+    based on the maximum pixel size of 8 million. Then, saves the DEM tiles
     as GeoTIFF files and returns the file paths. The default resolution is 10.
 - `get_map`: Retrieve any of the map products within a bounding box at any
     resolution. Similar to the `get_dem` function, this function returns the
@@ -47,14 +47,16 @@ Seamless3DEP has four functions:
 - `decompose_bbox`: Decompose a large bounding box into smaller based on maximum
     pixel size. Both `get_dem` and `get_map` functions use this function to
     decompose the bounding box into smaller ones with a default maximum pixel
-    size of 10 million.
+    size of 8 million.
 - `build_vrt`: Build a virtual raster file (VRT) from a list of raster files.
     This function can be used to build a VRT file from the downloaded GeoTIFF files.
     Note that GDAL must be installed to use this function which is an optional
     dependency.
 
 Note that the input bounding box should be in the format of (west, south, east, north)
-in decimal degrees (WGS84).
+in decimal degrees (WGS84). By default, maps are in 5070 projection. Note that at the
+moment, due to an issue with 3DEP web service, the `out_crs` parameter in `get_map`
+should not be set to 4326 since the service does not return the correct projection
 
 ## Installation
 
@@ -97,8 +99,8 @@ Now, let's get slope:
 
 ```python
 tiff_files = sdem.get_map("Slope Degrees", bbox, data_dir)
-slope_dyn_vrt = data_dir / "slope_vrain_3dep_dynamic.vrt"
-sdem.build_vrt(slope_dyn_vrt, slope_files)
+slope = data_dir / "slope.vrt"
+sdem.build_vrt(slope, slope_files)
 ```
 
 ![image](https://raw.githubusercontent.com/hyriver/seamless-3dep/main/docs/examples/images/slope_dynamic.png)
