@@ -52,8 +52,8 @@ jobs:
       with:
         attest-build-provenance-github: true
 
-  release-test-pypi:
-    name: Publish in-dev package to test.pypi.org
+  release-pypi:
+    name: Publish to PyPI
     runs-on: ubuntu-latest
     needs: build-package
 
@@ -64,26 +64,8 @@ jobs:
         name: Packages
         path: dist
 
-    - name: Upload package to Test PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        repository-url: https://test.pypi.org/legacy/
-        skip-existing: true
-
-  release-pypi:
-    name: Publish to PyPI
-    runs-on: ubuntu-latest
-    needs: release-test-pypi
-
-    steps:
-    - name: Download packages built by build-and-inspect-python-package
-      uses: actions/download-artifact@v4
-      with:
-        name: Packages
-        path: dist
-
     - name: Generate artifact attestation for sdist and wheel
-      uses: actions/attest-build-provenance@v1
+      uses: actions/attest-build-provenance@v2
       with:
         subject-path: dist
 
