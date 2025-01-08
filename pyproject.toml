@@ -199,15 +199,15 @@ ignore_errors = true
 
 [tool.coverage.paths]
 source = [ "src", "*/site-packages" ]
-omit = [
-  "**/__init__.py",
-]
 
 [tool.coverage.run]
 branch = true
 parallel = true
-source = [
+source_pkgs = [
   "seamless_3dep",
+]
+omit = [
+  "**/__init__.py",
 ]
 
 [tool.pyright]
