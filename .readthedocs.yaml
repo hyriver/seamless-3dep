@@ -6,7 +6,7 @@ build:
   tools:
     python: "3.13"
 
-sphinx:
+mkdocs:
    configuration: mkdocs.yml
 
 python:
