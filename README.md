@@ -12,7 +12,7 @@
 
 ## Features
 
-Seamless3DEP is an open-source Python package that provides a simple and
+Seamless3DEP is an open-source light-weight Python package that provides a simple and
 efficient way to retrieve topographic maps from the
 [3D Elevation Program (3DEP)](https://www.usgs.gov/core-science-systems/ngp/3dep).
 This web service provides both dynamic and static elevation products.
