@@ -37,20 +37,34 @@ dynamic = [
 dependencies = [
   "rasterio",
 ]
-
+optional-dependencies.dev = [
+  "geopandas>=1",
+  "ipykernel",
+  "ipywidgets",
+  "pytest",
+  "pywbt>=0.2.8",
+  "rasterio>=1.4.3",
+  "rioxarray",
+]
 optional-dependencies.docs = [
   "black",
-  "mdx-truly-sane-lists",
   "mkdocs",
   "mkdocs-jupyter",
   "mkdocs-material",
   "mkdocstrings-python",
+]
+optional-dependencies.lint = [
+  "codespell",
+  "pre-commit",
 ]
 optional-dependencies.test = [
   "coverage[toml]",
   "pytest",
   "pytest-cov",
   "pytest-sugar",
+]
+optional-dependencies.typecheck = [
+  "pyright",
 ]
 urls.Changelog = "https://seamless-3dep.readthedocs.io/latest/CHANGELOG"
 urls.CI = "https://github.com/hyriver/seamless-3dep/actions"
@@ -69,7 +83,7 @@ packages = [
 target-version = "py39"
 line-length = 100
 
-exclude = [ "__pycache__", "benchmarks" ]
+exclude = [ ".pixi", "__pycache__" ]
 
 lint.select = [
   # flake8-bugbear
@@ -185,7 +199,16 @@ skip = "__pycache__,_build,.mypy_cache,.git,./htmlcov,.pixi,pixi.lock,**.ipynb"
 ignore-words-list = "gage,gages"
 
 [tool.pytest.ini_options]
-addopts = "-v --cov-branch --cov-report=xml --durations=5"
+addopts = [
+  "--import-mode=importlib",
+  "-v",
+  "--cov",
+  "--cov-append",
+  "--cov-branch",
+  "--cov-report=xml",
+  "--junitxml=junit.xml",
+  "--durations=5",
+]
 doctest_optionflags = 'NORMALIZE_WHITESPACE IGNORE_EXCEPTION_DETAIL NUMBER'
 testpaths = [
   "tests",
@@ -231,3 +254,47 @@ reportUntypedFunctionDecorator = false
 reportAttributeAccessIssue = false
 reportInvalidTypeForm = false
 typeCheckingMode = "strict"
+
+[tool.pixi.feature.docs.tasks]
+build-docs = "mkdocs build --strict"
+docs = "mkdocs serve"
+
+[tool.pixi.project]
+channels = [ "conda-forge" ]
+platforms = [ "linux-64", "osx-64", "osx-arm64", "win-64" ]
+
+[tool.pixi.pypi-dependencies]
+seamless_3dep = { path = ".", editable = true }
+
+[tool.pixi.feature.dev.dependencies]
+gdal = "*"
+
+[tool.pixi.feature.test.dependencies]
+gdal = "*"
+
+[tool.pixi.feature.py39.dependencies]
+python = "~=3.9.0"
+
+[tool.pixi.feature.py313.dependencies]
+python = "~=3.13.0"
+
+[tool.pixi.environments]
+dev = { features = [ "dev", "py313" ] }
+test39 = { features = [ "test", "py39" ] }
+test313 = { features = [ "test", "py313" ] }
+typecheck = { features = [ "typecheck", "py313" ] }
+lint = { features = [ "lint", "py313" ], no-default-feature = true }
+docs = { features = [ "docs", "dev", "py313" ] }
+
+[tool.pixi.feature.test.tasks]
+test = "pytest"
+report = { cmd = [ "coverage", "report" ], depends-on = [ "test" ] }
+html = { cmd = [ "coverage", "html" ], depends-on = [ "report" ] }
+
+[tool.pixi.feature.lint.tasks]
+lint = "pre-commit run --all-files"
+pcupdate = "pre-commit autoupdate"
+spell = "codespell -w"
+
+[tool.pixi.feature.typecheck.tasks]
+typecheck = "pyright"

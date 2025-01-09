@@ -119,14 +119,11 @@ Ready to contribute? Here's how to set up Seamless3DEP for local development.
     git remote add upstream git@github.com:hyriver/seamless-3dep.git
     ```
 
-1. Install your local copy into a virtualenv. Assuming you have `micromamba` installed,
-    this is how you can set up your fork for local development:
+1. Install [Pixi](https://pixi.sh/latest/) then install the development environments:
 
     ```console
     cd seamless-3dep/
-    mamba env create -f ci/requirements/environment-dev.yml
-    mamba activate seamless-3dep-dev
-    python -m pip install . --no-deps
+    pixi install -e dev
     ```
 
 1. Create a branch for local development:
@@ -136,7 +133,12 @@ Ready to contribute? Here's how to set up Seamless3DEP for local development.
     git push
     ```
 
-1. Now you can make your changes locally, make sure to add a description of the changes to `HISTORY.rst` file and add extra tests, if applicable, to `tests` folder. Also, make sure to give yourself credit by adding your name at the end of the item(s) that you add in the history like this `By Taher Chegini <https://github.com/hyriver>`. Then, fetch the latest updates from the remote and resolve any merge conflicts:
+1. Now you can make your changes locally, make sure to add a description of the changes
+    to `CHANGELOG.md` file based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
+    and add extra tests, if applicable, to `tests` folder. Also,
+    make sure to give yourself credit by adding your name at the end of the item(s)
+    that you add in the history like this `by [Your Name](https://github.com/your_handle)`.
+    Then, fetch the latest updates from the remote and resolve any merge conflicts:
 
     ```console
     git fetch upstream
@@ -146,40 +148,26 @@ Ready to contribute? Here's how to set up Seamless3DEP for local development.
 1. Then create a new environment for linting and another for testing:
 
     ```console
-    mamba create -n py11 python=3.11 nox tomli pre-commit codespell gdal
-    mamba activate py11
-    nox -s pre-commit
-    nox -s type-check
-    mamba create -n py38 python=3.8 nox tomli pre-commit codespell gdal
-    mamba activate py38
-    nox -s tests
+    pixi r lint
+    pixi r typecheck
+    pixi r -e test39 test
+    pixi r -e test313 test
     ```
 
-    Note that if Python 3.11 is already installed on your system, you can skip creating the `py11` environment and just use your system's Python 3.11 to run the linting and type-checking tests, like this:
+1. If you are making breaking changes make sure to reflect them in the
+    documentation, `README.md`, and tests if necessary.
 
-    ```console
-    mamba create -n py38 python=3.8 nox tomli pre-commit codespell gdal
-    mamba activate py38
-    nox
-    ```
-
-1. If you are making breaking changes make sure to reflect them in the documentation, `README.rst`, and tests if necessary.
-
-1. Commit your changes and push your branch to GitHub. Start the commit message with `ENH:`, `BUG:`, `DOC:` to indicate whether the commit is a new feature, documentation related, or a bug fix. For example:
+1. Commit your changes and push your branch to GitHub following
+    [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
+    specification. For example:
 
     ```console
     git add .
-    git commit -m "ENH: A detailed description of your changes."
+    git commit -m "feat: a detailed description of your changes."
     git push origin name-of-your-branch
     ```
 
 1. Submit a pull request through the GitHub website.
-
-Note that to run a subset of tests you can use:
-
-```console
-nox -s tests -- -n=1 -k "test_name1 or test_name2"
-```
 
 ### Improving The Documentation
 
