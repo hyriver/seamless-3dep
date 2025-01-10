@@ -4,8 +4,7 @@ channels:
 - nodefaults
 dependencies:
 - python >=3.9
-# core
-- rasterio >=1.4.3
+- seamless-3dep
 # optional
 - gdal
 # notebooks
