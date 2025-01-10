@@ -1,5 +1,5 @@
 site_name: Seamless3DEP
-site_url: https://seamless_3dep.readthedocs.io
+site_url: https://seamless-3dep.readthedocs.io
 
 theme:
   name: material
@@ -61,7 +61,7 @@ theme:
   - toc.follow
   - toc.integrate
 
-repo_url: https://github.com/hyriver/seamless_3dep/
+repo_url: https://github.com/hyriver/seamless-3dep/
 edit_uri: edit/main/docs/
 
 markdown_extensions:
@@ -91,7 +91,7 @@ markdown_extensions:
     permalink: '#'
 
 extra:
-  homepage: https://seamless_3dep.readthedocs.io
+  homepage: https://seamless-3dep.readthedocs.io
   social:
   - icon: fontawesome/brands/mastodon
     link: https://mastodon.social/@taher
@@ -119,9 +119,6 @@ plugins:
       python:
         import:
         - https://docs.python.org/3/objects.inv
-        - https://docs.xarray.dev/en/stable/objects.inv
-        - https://corteva.github.io/rioxarray/stable/objects.inv
-        - https://pyproj4.github.io/pyproj/stable/objects.inv
         paths: [seamless_3dep]
         options:
           docstring_style: numpy
