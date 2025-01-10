@@ -39,6 +39,7 @@ dependencies = [
 ]
 optional-dependencies.dev = [
   "geopandas>=1",
+  "matplotlib",
   "ipykernel",
   "ipywidgets",
   "pytest",
