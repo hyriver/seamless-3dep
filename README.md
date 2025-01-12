@@ -36,22 +36,26 @@ contours. Here's the full list of available products:
 
 Seamless3DEP has four functions:
 
-- `get_dem`: Retrieve DEM within a bounding box at any resolution. When the
-    give resolution is 10, 30, or 60, the function will return the static DEM.
-    This function, under the hood, decomposes the bounding box into smaller ones
-    based on the maximum pixel size of 8 million. Then, saves the DEM tiles
-    as GeoTIFF files and returns the file paths. The default resolution is 10.
-- `get_map`: Retrieve any of the map products within a bounding box at any
-    resolution. Similar to the `get_dem` function, this function returns the
-    file paths of the downloaded GeoTIFF files. The default resolution is 10.
-- `decompose_bbox`: Decompose a large bounding box into smaller based on maximum
-    pixel size. Both `get_dem` and `get_map` functions use this function to
-    decompose the bounding box into smaller ones with a default maximum pixel
-    size of 8 million.
-- `build_vrt`: Build a virtual raster file (VRT) from a list of raster files.
-    This function can be used to build a VRT file from the downloaded GeoTIFF files.
-    Note that GDAL must be installed to use this function which is an optional
-    dependency.
+- `get_dem`: Retrieve DEM within a bounding box at 10, 30, or 60 from 3DEP's
+    static DEMs. This function, under the hood, decomposes the bounding box
+    into smaller ones based on the maximum pixel size of 8 million. Then,
+    saves the DEM tiles as GeoTIFF files and returns the file paths.
+    The default resolution is 10.
+- `get_map`: Retrieve any of the map products (including DEM) within a bounding
+    box at any resolution. Similar to the `get_dem` function, this function returns
+    the file paths of the downloaded GeoTIFF files for the decomposed bounds.
+    The default resolution is 10.
+- `decompose_bbox`: Decompose a large bounding box into smaller one based on
+    resolution and a maximum pixel size. Both `get_dem` and `get_map` functions
+    call this function to decompose the bounding box into smaller ones with a
+    default maximum pixel size of 8 million.
+- `build_vrt`: Build a virtual raster file (VRT) from the downloaded GeoTIff files
+    obtained from the `get_dem` or `get_map` functions. This function requires the
+    installation of `libgdal-core`. The recommended approach is to use `conda`
+    (or alternatives like `mamba` or `micromamba`). However, if using the system's
+    package manager is the only option, ensure that the `gdal-bin` or `gdal` package
+    is installed. For detailed instructions, refer to the GDAL documentation
+    [here](https://gdal.org/download.html).
 
 Note that the input bounding box should be in the format of (west, south, east, north)
 in decimal degrees (WGS84). By default, maps are in 5070 projection. Note that at the
@@ -71,8 +75,11 @@ repository using
 [micromamba](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html/):
 
 ```console
-micromamba install -c conda-forge seamless-3dep
+micromamba install -c conda-forge seamless-3dep libgdal-core
 ```
+
+Note that `libgdal-core` is only required if you want to use the `build_vrt`
+function.
 
 ## Quick start
 
@@ -95,7 +102,7 @@ dem = rxr.open_rasterio(dem_file).squeeze(drop=True)
 
 ![image](https://raw.githubusercontent.com/hyriver/seamless-3dep/main/docs/examples/images/dem.png)
 
-Now, let's get slope:
+Now, let's get the slope map within the same bounding box:
 
 ```python
 tiff_files = sdem.get_map("Slope Degrees", bbox, data_dir)
