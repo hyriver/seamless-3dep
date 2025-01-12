@@ -415,6 +415,8 @@ def build_vrt(vrt_path: str | Path, tiff_files: list[str] | list[Path]) -> None:
     However, if using the system's package manager is the only option, ensure that
     the ``gdal-bin`` or ``gdal`` package is installed. For detailed instructions,
     refer to the GDAL documentation [here](https://gdal.org/download.html).
+    When ``seamless-3dep`` is installed from Conda, ``libgdal-core`` is installed
+    as a dependency and this function works without any additional steps.
 
     Parameters
     ----------

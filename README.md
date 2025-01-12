@@ -60,7 +60,9 @@ processing:
     efficient data retrieval.
 - `build_vrt`: Creates virtual raster datasets by combining multiple GeoTIFF files.
     Requires `libgdal-core` installation and supports efficient data handling for large
-    areas.
+    areas. Note that `libgdal-core` is an optional dependency and is not installed when
+    `seamless-3dep` is installed from PyPI. However, it is installed as a dependency
+    when `seamless-3dep` is installed from `conda-forge`.
 
 ## Important Notes
 
@@ -74,24 +76,24 @@ processing:
 
 Choose your preferred installation method:
 
-### Using pip
+### Using `pip`
 
 ```console
 pip install seamless-3dep
 ```
 
-### Using conda-forge (recommended)
+### Using `micromamba` (recommended)
 
 ```console
-micromamba install -c conda-forge seamless-3dep libgdal-core
+micromamba install -c conda-forge seamless-3dep
 ```
 
-Note: `libgdal-core` is only required for VRT functionality.
+Alternatively, you can use `conda` or `mamba`.
 
 ## Quick Start Guide
 
-We can retrieve topographic data using Seamless3DEP in just a few lines of code. Then we
-can visualize or even reproject the data using `rioxarray`.
+We can retrieve topographic data using Seamless3DEP in just a few lines of code. Then,
+we can visualize or even reproject the data using `rioxarray`.
 
 ### Retrieving a DEM
 
@@ -123,7 +125,6 @@ dem = rxr.open_rasterio(dem_file).squeeze(drop=True)
 ### Retrieving a Slope Map
 
 ```python
-# Download slope data
 slope_files = sdem.get_map("Slope Degrees", bbox, data_dir)
 ```
 
