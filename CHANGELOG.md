@@ -11,7 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-## [0.2.0] - 2024-12-20
+## [0.2.1] - 2025-01-11
+
+### Changed
+
+- Improve downloading of 3DEP map requests in `get_map` by streaming the response
+    content to a file instead of loading it into memory. Also make exception handling
+    more robust. The function has been refactored for better readability and
+    maintainability.
+- Change the dependency of `build_vrt` from `gdal` to `libgdal-core` as it is
+    more lightweight and does not require the full `gdal` package to be installed.
+- Improve documentation.
+
+## [0.2.0] - 2025-01-08
 
 ### Changed
 
