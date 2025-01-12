@@ -39,9 +39,9 @@ dependencies = [
 ]
 optional-dependencies.dev = [
   "geopandas>=1",
-  "matplotlib",
   "ipykernel",
   "ipywidgets",
+  "matplotlib",
   "pytest",
   "pywbt>=0.2.8",
   "rasterio>=1.4.3",
@@ -67,7 +67,7 @@ optional-dependencies.test = [
 optional-dependencies.typecheck = [
   "pyright",
 ]
-urls.Changelog = "https://seamless-3dep.readthedocs.io/latest/CHANGELOG"
+urls.Changelog = "https://seamless-3dep.readthedocs.io/en/latest/CHANGELOG"
 urls.CI = "https://github.com/hyriver/seamless-3dep/actions"
 urls.Homepage = "https://seamless-3dep.readthedocs.io"
 urls.Issues = "https://github.com/hyriver/seamless-3dep/issues"
@@ -187,6 +187,10 @@ lint.per-file-ignores."tests/*.py" = [
   "S101",
 ]
 lint.extend-safe-fixes = [
+  # Move third-party import
+  "TC002",
+  # Move import out of type-checking block
+  "TC004",
   # absolute imports
   "TID252",
 ]
@@ -268,10 +272,10 @@ platforms = [ "linux-64", "osx-64", "osx-arm64", "win-64" ]
 seamless_3dep = { path = ".", editable = true }
 
 [tool.pixi.feature.dev.dependencies]
-gdal = "*"
+libgdal-core = "*"
 
 [tool.pixi.feature.test.dependencies]
-gdal = "*"
+libgdal-core = "*"
 
 [tool.pixi.feature.py39.dependencies]
 python = "~=3.9.0"
