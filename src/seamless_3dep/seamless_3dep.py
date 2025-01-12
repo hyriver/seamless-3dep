@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import hashlib
 import math
+import os
+import subprocess
 import urllib.error
 import urllib.parse
-import urllib.request
 from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, overload
+from urllib.request import urlopen
 
 import rasterio
 import rasterio.windows
@@ -35,12 +37,13 @@ if TYPE_CHECKING:
 __all__ = ["build_vrt", "decompose_bbox", "get_dem", "get_map"]
 
 MAX_PIXELS = 8_000_000
+CHUNK_SIZE = 1048576  # 1 MB
 
 
 class DownloadError(Exception):
     """Error raised when download fails."""
 
-    def __init__(self, url: str, err_msg: Exception) -> None:
+    def __init__(self, url: str, err_msg: Exception | str) -> None:
         message = f"Failed to download from {url}:\n{err_msg}"
         super().__init__(message)
 
@@ -250,13 +253,40 @@ def get_dem(
     return tiff_list
 
 
-def _get_map(url: str, tiff_path: Path) -> None:
-    """Call 3DEP's REST API to get the map and save it as a GeoTiff file."""
-    if tiff_path.exists():
-        with urllib.request.urlopen(urllib.request.Request(url, method="HEAD")) as r:
-            if tiff_path.stat().st_size == int(r.headers["Content-Length"]):
-                return
-    urllib.request.urlretrieve(url, tiff_path)
+def _download(url: str, file_path: Path) -> None:
+    """Download a file from a URL with streaming."""
+    with urlopen(url) as response:
+        total_size = int(response.headers.get("Content-Length", -1))
+        if file_path.exists() and file_path.stat().st_size == total_size:
+            return
+
+        downloaded = 0
+        with file_path.open("wb") as out_file:
+            while chunk := response.read(CHUNK_SIZE):
+                out_file.write(chunk)
+                downloaded += len(chunk)
+
+        if downloaded != total_size:
+            file_path.unlink(missing_ok=True)
+            raise DownloadError(url, "Downloaded file size mismatch")
+
+
+def _download_files(url_list: list[str], files_list: list[Path]) -> None:
+    """Download multiple files concurrently."""
+    max_workers = min(4, len(url_list), os.cpu_count() or 1)
+    if max_workers == 1:
+        _ = [_download(url, path) for url, path in zip(url_list, files_list)]
+        return
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_url = {
+            executor.submit(_download, url, path): url for url, path in zip(url_list, files_list)
+        }
+        for future in as_completed(future_to_url):
+            try:
+                future.result()
+            except Exception as e:  # noqa: PERF203
+                raise DownloadError(future_to_url[future], e) from e
 
 
 def get_map(
@@ -344,7 +374,7 @@ def get_map(
     params = {
         "bboxSR": 4326,
         "imageSR": out_crs,
-        "size": ",".join(map(str, (sub_width, sub_height))),
+        "size": f"{sub_width},{sub_height}",
         "format": "tiff",
         "interpolation": "RSP_BilinearInterpolation",
         "f": "image",
@@ -353,36 +383,38 @@ def get_map(
         params["renderingRule"] = f'{{"rasterFunction":"{map_type}"}}'
 
     url = "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage"
-    url_list = []
-    for box in bbox_list:
-        params["bbox"] = ",".join(str(round(c, 6)) for c in box)
-        url_list.append(f"{url}?{urllib.parse.urlencode(params)}")
-
-    n_jobs = min(4, len(url_list))
-    if n_jobs == 1:
-        _get_map(url_list[0], tiff_list[0])
-    else:
-        with ThreadPoolExecutor(max_workers=n_jobs) as executor:
-            future_to_url = {
-                executor.submit(_get_map, url, path): url for url, path in zip(url_list, tiff_list)
-            }
-            for future in as_completed(future_to_url):
-                url = future_to_url[future]
-                try:
-                    future.result()
-                except urllib.error.HTTPError as e:
-                    raise DownloadError(url, e) from e
+    url_list = [
+        f"{url}?bbox={','.join(str(round(c, 6)) for c in box)}&{urllib.parse.urlencode(params)}"
+        for box in bbox_list
+    ]
+    _download_files(url_list, tiff_list)
     return tiff_list
 
 
-def build_vrt(
-    vrt_path: str | Path, tiff_files: list[str] | list[Path], relative: bool = False
-) -> None:
+@overload
+def _path2str(path: Path | str) -> str: ...
+
+
+@overload
+def _path2str(path: list[Path] | list[str]) -> list[str]: ...
+
+
+def _path2str(path: Path | str | list[Path] | list[str]) -> str | list[str]:
+    if isinstance(path, (list, tuple)):
+        return [Path(p).resolve().as_posix() for p in path]
+    return Path(path).resolve().as_posix()
+
+
+def build_vrt(vrt_path: str | Path, tiff_files: list[str] | list[Path]) -> None:
     """Create a VRT from a list of GeoTIFF tiles.
 
     Notes
     -----
-    This function requires GDAL to be installed.
+    This function requires the installation of ``libgdal-core``. The recommended
+    approach is to use ``conda`` (or alternatives like ``mamba`` or ``micromamba``).
+    However, if using the system's package manager is the only option, ensure that
+    the ``gdal-bin`` or ``gdal`` package is installed. For detailed instructions,
+    refer to the GDAL documentation [here](https://gdal.org/download.html).
 
     Parameters
     ----------
@@ -390,13 +422,10 @@ def build_vrt(
         Path to save the output VRT file.
     tiff_files : list of str or Path
         List of file paths to include in the VRT.
-    relative : bool, optional
-        If True, use paths relative to the VRT file (default is False).
     """
-    try:
-        from osgeo import gdal  # pyright: ignore[reportMissingImports]
-    except ImportError as e:
-        raise ImportError("GDAL is required to run `build_vrt`.") from e
+    exit_code, _ = subprocess.getstatusoutput("gdalinfo --version")
+    if exit_code != 0:
+        raise ImportError("GDAL (`libgdal-core`) is required to run `build_vrt`.")
 
     vrt_path = Path(vrt_path).resolve()
     tiff_files = [Path(f).resolve() for f in tiff_files]
@@ -404,6 +433,5 @@ def build_vrt(
     if not tiff_files or not all(f.exists() for f in tiff_files):
         raise ValueError("No valid files found.")
 
-    gdal.UseExceptions()
-    vrt_options = gdal.BuildVRTOptions(resampleAlg="nearest", addAlpha=False)
-    _ = gdal.BuildVRT(vrt_path, tiff_files, options=vrt_options, relativeToVRT=relative)
+    command = ["gdalbuildvrt", "-r", "nearest", _path2str(vrt_path), *_path2str(tiff_files)]
+    subprocess.run(command, check=True, text=True, capture_output=True)
