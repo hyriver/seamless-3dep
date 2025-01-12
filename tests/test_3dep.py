@@ -89,8 +89,8 @@ def test_decompose_bbox_aspect_ratio():
     sub_height = abs(box[3] - box[1])
     sub_aspect = sub_width / sub_height
 
-    # Aspect ratios should be similar
-    assert abs(orig_aspect - sub_aspect) < 0.5  # Allow some deviation due to rounding
+    # Aspect ratios should be similar with some deviation due to rounding
+    assert abs(orig_aspect - sub_aspect) < 0.5
 
 
 def test_decompose_bbox_coverage():
@@ -117,8 +117,9 @@ def test_decompose_bbox_coverage():
     assert orig_points.issubset(points_covered)
 
 
-def test_dem():
+def test_dem_and_vrt():
     bbox = (-121.1, 37.9, -121.0, 38.0)
+    tiff_files = sdem.get_dem(bbox, "dem_data", 30)
     tiff_files = sdem.get_dem(bbox, "dem_data", 30)
     tiff_files[0].unlink()
     tiff_files = sdem.get_dem(bbox, "dem_data", 30, pixel_max=None)
@@ -136,6 +137,7 @@ def test_dem():
 def test_3dep():
     bbox = (-121.1, 37.9, -121.0, 38.0)
     tiff_files = sdem.get_map("Slope Degrees", bbox, "slope_data", 30, pixel_max=None)
+    tiff_files = sdem.get_map("Slope Degrees", bbox, "slope_data", 30)
     tiff_files = sdem.get_map("Slope Degrees", bbox, "slope_data", 30)
     with rasterio.open(tiff_files[0]) as src:
         assert src.shape == (371, 293)
