@@ -8,15 +8,15 @@ import os
 import subprocess
 import urllib.error
 import urllib.parse
-from collections.abc import Sequence
+from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, overload
-from urllib.request import urlopen
 
 import rasterio
 import rasterio.windows
+
+from seamless_3dep._pools import HTTPs, VRTLinks, VRTPool
 
 if TYPE_CHECKING:
     MapTypes = Literal[
@@ -33,11 +33,12 @@ if TYPE_CHECKING:
         "Contour 25",
         "Contour Smoothed 25",
     ]
+    from rasterio.io import DatasetReader
+    from rasterio.transform import Affine
 
 __all__ = ["build_vrt", "decompose_bbox", "get_dem", "get_map"]
 
 MAX_PIXELS = 8_000_000
-CHUNK_SIZE = 1048576  # 1 MB
 
 
 class DownloadError(Exception):
@@ -48,20 +49,9 @@ class DownloadError(Exception):
         super().__init__(message)
 
 
-@lru_cache
-def _get_bounds(url: str) -> tuple[float, float, float, float]:
-    """Get bounds of a VRT file."""
-    with rasterio.open(url) as src:
-        return tuple(src.bounds)
-
-
 def _check_bbox(bbox: tuple[float, float, float, float]) -> None:
     """Validate that bbox is in correct form."""
-    if (
-        not isinstance(bbox, Sequence)
-        or len(bbox) != 4
-        or not all(isinstance(x, (int, float)) for x in bbox)
-    ):
+    if not (isinstance(bbox, Iterable) and len(bbox) == 4 and all(map(math.isfinite, bbox))):
         raise TypeError(
             "`bbox` must be a tuple of form (west, south, east, north) in decimal degrees."
         )
@@ -157,25 +147,30 @@ def decompose_bbox(
     return boxes, sub_width, sub_height
 
 
-def _clip_3dep(vrt_url: str, box: tuple[float, float, float, float], tiff_path: Path) -> None:
+def _clip_3dep(
+    vrt_pool: DatasetReader,
+    box: tuple[float, float, float, float],
+    tiff_path: Path,
+    transform: Affine,
+    nodata: float,
+) -> None:
     """Clip 3DEP to a bbox and save it as a GeoTiff file with NaN as nodata."""
     if not tiff_path.exists():
-        with rasterio.open(vrt_url) as src:
-            window = rasterio.windows.from_bounds(*box, transform=src.transform)
-            meta = src.meta.copy()
-            meta.update(
-                {
-                    "driver": "GTiff",
-                    "height": window.height,
-                    "width": window.width,
-                    "transform": rasterio.windows.transform(window, src.transform),
-                    "nodata": math.nan,
-                }
-            )
-            data = src.read(window=window)
-            data[data == src.nodata] = math.nan
-            with rasterio.open(tiff_path, "w", **meta) as dst:
-                dst.write(data)
+        window = rasterio.windows.from_bounds(*box, transform=transform)
+        meta = vrt_pool.meta.copy()
+        meta.update(
+            {
+                "driver": "GTiff",
+                "height": window.height,
+                "width": window.width,
+                "transform": rasterio.windows.transform(window, transform),
+                "nodata": math.nan,
+            }
+        )
+        data = vrt_pool.read(window=window)
+        data[data == nodata] = math.nan
+        with rasterio.open(tiff_path, "w", **meta) as dst:
+            dst.write(data)
 
 
 def _create_hash(box: tuple[float, float, float, float], res: int, crs: int) -> str:
@@ -214,19 +209,14 @@ def get_dem(
     list of pathlib.Path
         list of GeoTiff files containing the DEM clipped to the bounding box.
     """
-    base_url = "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation"
-    url = {
-        10: f"{base_url}/13/TIFF/USGS_Seamless_DEM_13.vrt",
-        30: f"{base_url}/1/TIFF/USGS_Seamless_DEM_1.vrt",
-        60: f"{base_url}/2/TIFF/USGS_Seamless_DEM_2.vrt",
-    }
-    if res not in url:
+    if res not in VRTLinks:
         raise ValueError("`res` must be one of 10, 30, or 60 meters.")
 
     bbox_list, _, _ = decompose_bbox(bbox, res, pixel_max)
 
-    vrt_url = url[res]
-    _check_bounds(bbox, _get_bounds(vrt_url))
+    vrt_pool = VRTPool.get_pool(res)
+    vrt_info = VRTPool.get_vrt_info(res)
+    _check_bounds(bbox, vrt_info.bounds)
 
     save_dir = Path(save_dir)
     save_dir.mkdir(parents=True, exist_ok=True)
@@ -235,52 +225,50 @@ def get_dem(
     if all(tiff.exists() for tiff in tiff_list):
         return tiff_list
 
-    n_jobs = min(4, len(bbox_list))
-    if n_jobs == 1:
-        _clip_3dep(vrt_url, bbox_list[0], tiff_list[0])
-    else:
-        with ThreadPoolExecutor(max_workers=n_jobs) as executor:
-            future_to_url = {
-                executor.submit(_clip_3dep, vrt_url, box, path): (box, path)
-                for box, path in zip(bbox_list, tiff_list)
-            }
-            for future in as_completed(future_to_url):
-                url = future_to_url[future]
-                try:
-                    future.result()
-                except Exception as e:
-                    raise DownloadError(vrt_url, e) from e
+    max_workers = min(4, os.cpu_count() or 1, len(bbox_list))
+    if max_workers == 1:
+        _ = [
+            _clip_3dep(vrt_pool, box, path, vrt_info.transform, vrt_info.nodata)
+            for box, path in zip(bbox_list, tiff_list)
+        ]
+        return tiff_list
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_url = {
+            executor.submit(_clip_3dep, vrt_pool, box, path, vrt_info.transform, vrt_info.nodata): (
+                box,
+                path,
+            )
+            for box, path in zip(bbox_list, tiff_list)
+        }
+        for future in as_completed(future_to_url):
+            try:
+                future.result()
+            except Exception as e:  # noqa: PERF203
+                raise DownloadError(VRTLinks[res], e) from e
     return tiff_list
 
 
-def _download(url: str, file_path: Path) -> None:
-    """Download a file from a URL with streaming."""
-    with urlopen(url) as response:
-        total_size = int(response.headers.get("Content-Length", -1))
-        if file_path.exists() and file_path.stat().st_size == total_size:
-            return
-
-        downloaded = 0
-        with file_path.open("wb") as out_file:
-            while chunk := response.read(CHUNK_SIZE):
-                out_file.write(chunk)
-                downloaded += len(chunk)
-
-        if downloaded != total_size:
-            file_path.unlink(missing_ok=True)
-            raise DownloadError(url, "Downloaded file size mismatch")
+def _download(path_query: str, fname: Path) -> None:
+    """Download a file from a URL."""
+    head = HTTPs.request("HEAD", path_query)
+    fsize = int(head.headers.get("Content-Length", -1))
+    if fname.exists() and fname.stat().st_size == fsize:
+        return
+    fname.unlink(missing_ok=True)
+    fname.write_bytes(HTTPs.request("GET", path_query).data)
 
 
-def _download_files(url_list: list[str], files_list: list[Path]) -> None:
+def _download_files(pq_list: list[str], files_list: list[Path]) -> None:
     """Download multiple files concurrently."""
-    max_workers = min(4, len(url_list), os.cpu_count() or 1)
+    max_workers = min(4, len(pq_list), os.cpu_count() or 1)
     if max_workers == 1:
-        _ = [_download(url, path) for url, path in zip(url_list, files_list)]
+        _ = [_download(pq, path) for pq, path in zip(pq_list, files_list)]
         return
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_url = {
-            executor.submit(_download, url, path): url for url, path in zip(url_list, files_list)
+            executor.submit(_download, pq, path): pq for pq, path in zip(pq_list, files_list)
         }
         for future in as_completed(future_to_url):
             try:
@@ -382,12 +370,12 @@ def get_map(
     if map_type != "DEM":
         params["renderingRule"] = f'{{"rasterFunction":"{map_type}"}}'
 
-    url = "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage"
-    url_list = [
-        f"{url}?bbox={','.join(str(round(c, 6)) for c in box)}&{urllib.parse.urlencode(params)}"
+    path = "/arcgis/rest/services/3DEPElevation/ImageServer/exportImage"
+    pq_list = [
+        f"{path}?bbox={','.join(str(round(c, 6)) for c in box)}&{urllib.parse.urlencode(params)}"
         for box in bbox_list
     ]
-    _download_files(url_list, tiff_list)
+    _download_files(pq_list, tiff_list)
     return tiff_list
 
 
