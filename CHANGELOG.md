@@ -11,11 +11,20 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
+## [0.2.2] - 2025-01-13
+
+### Changed
+
 - Considerable improvements in making service calls by creating connection pools using
     `urllib3.HTTPSConnectionPool` and `rasterio.open`. This should improve performance
     and robustness of service calls, and reduce the number of connections made to both
     the static and dynamic 3DEP services. As a results, `urllib3` is now a required
     dependency.
+- Add a new private module called `_pools` that contains the connection pools for making
+    service calls. The pools are lazily initialized and are shared across threads.
+    Especially the VRT pools are created only when a specific resolution is requested,
+    and are reused for subsequent requests of the same resolution. As such, the VRT info
+    are loaded only once per resolution without using `lru_cache`.
 
 ## [0.2.1] - 2025-01-11
 
