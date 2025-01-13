@@ -155,6 +155,7 @@ def test_3dep_3857():
         assert src.shape == (371, 293)
     shutil.rmtree("data_3857", ignore_errors=True)
 
+
 @pytest.fixture(scope="session", autouse=True)
 def cleanup_after_all_tests():
     """Run cleanup logic at the end of the entire test session."""
