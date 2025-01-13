@@ -11,6 +11,12 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
+- Considerable improvements in making service calls by creating connection pools using
+    `urllib3.HTTPSConnectionPool` and `rasterio.open`. This should improve performance
+    and robustness of service calls, and reduce the number of connections made to both
+    the static and dynamic 3DEP services. As a results, `urllib3` is now a required
+    dependency.
+
 ## [0.2.1] - 2025-01-11
 
 ### Changed
