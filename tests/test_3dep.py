@@ -7,6 +7,7 @@ import pytest
 import rasterio
 
 import seamless_3dep as sdem
+from seamless_3dep._pools import _cleanup_pools
 
 
 @pytest.fixture
@@ -153,3 +154,9 @@ def test_3dep_3857():
     with rasterio.open(tiff_files[0]) as src:
         assert src.shape == (371, 293)
     shutil.rmtree("data_3857", ignore_errors=True)
+
+@pytest.fixture(scope="session", autouse=True)
+def cleanup_after_all_tests():
+    """Run cleanup logic at the end of the entire test session."""
+    yield  # All tests run before this point
+    _cleanup_pools()
