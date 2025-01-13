@@ -17,6 +17,11 @@ from the USGS
 Whether you need elevation data or its derivatives, Seamless3DEP provides an efficient
 interface to both static and dynamic 3DEP products.
 
+Seamless3DEP utilizes connection pooling across threads (safely) to optimize service
+calls and minimize redundant connections. This reduces both the service load and the
+time required to retrieve data, making it an ideal tool for handling large-scale
+topographic data requests.
+
 📚 Full documentation is available [here](https://seamless-3dep.readthedocs.io).
 
 ## Available Products
