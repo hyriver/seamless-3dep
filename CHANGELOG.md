@@ -11,8 +11,8 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
-- More robust handling of closing connection pools at exit by creating a new method
-    in both `HTTPSPool` and `VRTPool` to close the pool. This method is called by the
+- More robust handling of closing connection pools at exit by creating a new method in
+    both `HTTPSPool` and `VRTPool` to close the pool. This method is called by the
     `atexit` module to ensure that the pools are closed when the program exits.
 
 ## [0.2.2] - 2025-01-13
