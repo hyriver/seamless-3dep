@@ -214,7 +214,7 @@ def get_dem(
 
     bbox_list, _, _ = decompose_bbox(bbox, res, pixel_max)
 
-    vrt_pool = VRTPool.get_pool(res)
+    vrt_pool = VRTPool.get_dataset_reader(res)
     vrt_info = VRTPool.get_vrt_info(res)
     _check_bounds(bbox, vrt_info.bounds)
 
@@ -315,8 +315,9 @@ def get_map(
         be a well-known ID (WKID) like 3857 or 5070. Do not use 4326 since at the moment
         the 3DEP web service does not return correct results.
     pixel_max : int, optional
-        Maximum number of pixels allowed in decomposing the bbox into equal-area
-        sub-bboxes, by default 8 million. If ``None``, the bbox is not decomposed.
+        Maximum number of pixels allowed in each sub-bbox for decomposing the bbox
+        into equal-area sub-bboxes, by default 8 million. If ``None``, the bbox
+        is not decomposed, and is downloaded as a single file.
 
     Returns
     -------
