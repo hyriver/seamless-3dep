@@ -45,8 +45,17 @@ class HTTPSPool:
                             status_forcelist=[500, 502, 504],
                             allowed_methods=["HEAD", "GET"],
                         ),
+                        timeout=10.0,
                     )
         return cls._instance
+
+    @classmethod
+    def close(cls):
+        """Cleanup the HTTPx client."""
+        with cls._lock:
+            if cls._instance is not None:
+                cls._instance.close()
+                cls._instance = None
 
 
 @dataclass
@@ -64,24 +73,39 @@ class VRTPool:
     _lock: ClassVar[Lock] = Lock()
 
     @classmethod
-    def get_pool(cls, resolution: int) -> DatasetReader:
+    def get_dataset_reader(cls, resolution: int) -> DatasetReader:
         """Retrieve or initialize a DatasetReader for the given resolution."""
         if resolution not in cls._instances:
             with cls._lock:
                 if resolution not in cls._instances:  # Double-check locking
-                    pool = rasterio.open(VRTLinks[resolution])
-                    cls._instances[resolution] = pool
-                    cls._info[resolution] = VRTInfo(
-                        bounds=tuple(pool.bounds),
-                        transform=pool.transform,
-                        nodata=pool.nodata,
-                    )
+                    try:
+                        pool = rasterio.open(VRTLinks[resolution])
+                        cls._instances[resolution] = pool
+                        cls._info[resolution] = VRTInfo(
+                            bounds=tuple(pool.bounds),
+                            transform=pool.transform,
+                            nodata=pool.nodata,
+                        )
+                    except Exception as e:
+                        raise RuntimeError(
+                            f"Failed to open VRT for resolution {resolution}: {e}"
+                        ) from e
         return cls._instances[resolution]
 
     @classmethod
     def get_vrt_info(cls, resolution: int) -> VRTInfo:
         """Retrieve metadata for the given resolution."""
+        _ = cls.get_dataset_reader(resolution)
         return cls._info[resolution]
+
+    @classmethod
+    def close(cls):
+        """Cleanup the DatasetReaders."""
+        with cls._lock:
+            for reader in cls._instances.values():
+                if reader:
+                    reader.close()
+            cls._instances.clear()
 
 
 HTTPs = HTTPSPool.get_instance()
@@ -89,13 +113,8 @@ HTTPs = HTTPSPool.get_instance()
 
 def _cleanup_pools():
     """Cleanup the HTTPS connection pool and DatasetReaders."""
-    with HTTPSPool._lock:
-        if HTTPs:
-            HTTPs.close()
-    with VRTPool._lock:
-        for reader in VRTPool._instances.values():
-            if reader:
-                reader.close()
+    HTTPs.close()
+    VRTPool.close()
 
 
 atexit.register(_cleanup_pools)
