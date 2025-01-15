@@ -16,9 +16,13 @@ from typing import TYPE_CHECKING, Literal, overload
 import rasterio
 import rasterio.windows
 
-from seamless_3dep._pools import HTTPs, VRTLinks, VRTPool
+from seamless_3dep._pools import HTTPSPool, VRTLinks, VRTPool
 
 if TYPE_CHECKING:
+    from rasterio.io import DatasetReader
+    from rasterio.transform import Affine
+    from urllib3 import HTTPSConnectionPool
+
     MapTypes = Literal[
         "DEM",
         "Hillshade Gray",
@@ -33,8 +37,6 @@ if TYPE_CHECKING:
         "Contour 25",
         "Contour Smoothed 25",
     ]
-    from rasterio.io import DatasetReader
-    from rasterio.transform import Affine
 
 __all__ = ["build_vrt", "decompose_bbox", "get_dem", "get_map"]
 
@@ -249,26 +251,27 @@ def get_dem(
     return tiff_list
 
 
-def _download(path_query: str, fname: Path) -> None:
+def _download(https: HTTPSConnectionPool, path_query: str, fname: Path) -> None:
     """Download a file from a URL."""
-    head = HTTPs.request("HEAD", path_query)
+    head = https.request("HEAD", path_query)
     fsize = int(head.headers.get("Content-Length", -1))
     if fname.exists() and fname.stat().st_size == fsize:
         return
     fname.unlink(missing_ok=True)
-    fname.write_bytes(HTTPs.request("GET", path_query).data)
+    fname.write_bytes(https.request("GET", path_query).data)
 
 
 def _download_files(pq_list: list[str], files_list: list[Path]) -> None:
     """Download multiple files concurrently."""
+    https = HTTPSPool.get_instance()
     max_workers = min(4, len(pq_list), os.cpu_count() or 1)
     if max_workers == 1:
-        _ = [_download(pq, path) for pq, path in zip(pq_list, files_list)]
+        _ = [_download(https, pq, path) for pq, path in zip(pq_list, files_list)]
         return
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_url = {
-            executor.submit(_download, pq, path): pq for pq, path in zip(pq_list, files_list)
+            executor.submit(_download, https, pq, path): pq for pq, path in zip(pq_list, files_list)
         }
         for future in as_completed(future_to_url):
             try:
@@ -316,8 +319,8 @@ def get_map(
         the 3DEP web service does not return correct results.
     pixel_max : int, optional
         Maximum number of pixels allowed in each sub-bbox for decomposing the bbox
-        into equal-area sub-bboxes, by default 8 million. If ``None``, the bbox
-        is not decomposed, and is downloaded as a single file.
+        into equal-area sub-bboxes, defaults to 8 million. If ``None``, the bbox
+        is not decomposed and is downloaded as a single file.
 
     Returns
     -------
@@ -357,9 +360,6 @@ def get_map(
 
     rule = map_type.replace(" ", "_").lower()
     tiff_list = [save_dir / f"{rule}_{_create_hash(box, res, out_crs)}.tiff" for box in bbox_list]
-    if all(tiff.exists() for tiff in tiff_list):
-        return tiff_list
-
     params = {
         "bboxSR": 4326,
         "imageSR": out_crs,

@@ -106,8 +106,8 @@ class VRTPool:
                 if reader:
                     reader.close()
             cls._instances.clear()
+            cls._info.clear()
 
 
-HTTPs = HTTPSPool.get_instance()
-atexit.register(HTTPs.close)
+atexit.register(HTTPSPool.close)
 atexit.register(VRTPool.close)
