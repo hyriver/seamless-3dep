@@ -109,12 +109,5 @@ class VRTPool:
 
 
 HTTPs = HTTPSPool.get_instance()
-
-
-def _cleanup_pools():
-    """Cleanup the HTTPS connection pool and DatasetReaders."""
-    HTTPs.close()
-    VRTPool.close()
-
-
-atexit.register(_cleanup_pools)
+atexit.register(HTTPs.close)
+atexit.register(VRTPool.close)
