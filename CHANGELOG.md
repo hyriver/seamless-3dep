@@ -11,9 +11,18 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
-- More robust handling of closing connection pools at exit by creating a new method in
-    both `HTTPSPool` and `VRTPool` to close the pool. This method is called by the
-    `atexit` module to ensure that the pools are closed when the program exits.
+## [0.2.3] - 2025-01-18
+
+### Changed
+
+- Use `aiohttp` and `aiofiles` for more performant and robust handling of service calls
+    and downloading of 3DEP map requests. This should improve performance and robustness
+    of service calls, and reduce the number of connections made to dynamic 3DEP
+    services. As a results, `aiohttp` and `aiofiles` are now required dependencies and
+    `urllib3` is no longer needed.
+- More robust handling of closing `VRTPool` at exit by creating a new class method
+    called `close`. This method is called by the `atexit` module to ensure that the
+    pools are closed when the program exits.
 
 ## [0.2.2] - 2025-01-13
 
