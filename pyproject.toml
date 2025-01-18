@@ -35,8 +35,9 @@ dynamic = [
   "version",
 ]
 dependencies = [
+  "aiofiles",
+  "aiohttp>=3.8.3",
   "rasterio",
-  "urllib3",
 ]
 optional-dependencies.dev = [
   "geopandas>=1",
@@ -188,6 +189,8 @@ lint.per-file-ignores."tests/*.py" = [
   "S101",
 ]
 lint.extend-safe-fixes = [
+  # module level imports
+  "E402",
   # break down assert
   "PT018",
   # Move imports
