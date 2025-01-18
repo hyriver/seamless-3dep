@@ -6,22 +6,21 @@ import hashlib
 import math
 import os
 import subprocess
-import urllib.error
-import urllib.parse
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, overload
+from urllib.parse import urlencode
 
 import rasterio
 import rasterio.windows
 
-from seamless_3dep._pools import HTTPSPool, VRTLinks, VRTPool
+from seamless_3dep._https_download import ServiceError, stream_write
+from seamless_3dep._vrt_pools import VRTLinks, VRTPool
 
 if TYPE_CHECKING:
     from rasterio.io import DatasetReader
     from rasterio.transform import Affine
-    from urllib3 import HTTPSConnectionPool
 
     MapTypes = Literal[
         "DEM",
@@ -41,14 +40,6 @@ if TYPE_CHECKING:
 __all__ = ["build_vrt", "decompose_bbox", "get_dem", "get_map"]
 
 MAX_PIXELS = 8_000_000
-
-
-class DownloadError(Exception):
-    """Error raised when download fails."""
-
-    def __init__(self, url: str, err_msg: Exception | str) -> None:
-        message = f"Failed to download from {url}:\n{err_msg}"
-        super().__init__(message)
 
 
 def _check_bbox(bbox: tuple[float, float, float, float]) -> None:
@@ -247,37 +238,8 @@ def get_dem(
             try:
                 future.result()
             except Exception as e:  # noqa: PERF203
-                raise DownloadError(VRTLinks[res], e) from e
+                raise ServiceError(str(e), VRTLinks[res]) from e
     return tiff_list
-
-
-def _download(https: HTTPSConnectionPool, path_query: str, fname: Path) -> None:
-    """Download a file from a URL."""
-    head = https.request("HEAD", path_query)
-    fsize = int(head.headers.get("Content-Length", -1))
-    if fname.exists() and fname.stat().st_size == fsize:
-        return
-    fname.unlink(missing_ok=True)
-    fname.write_bytes(https.request("GET", path_query).data)
-
-
-def _download_files(pq_list: list[str], files_list: list[Path]) -> None:
-    """Download multiple files concurrently."""
-    https = HTTPSPool.get_instance()
-    max_workers = min(4, len(pq_list), os.cpu_count() or 1)
-    if max_workers == 1:
-        _ = [_download(https, pq, path) for pq, path in zip(pq_list, files_list)]
-        return
-
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_url = {
-            executor.submit(_download, https, pq, path): pq for pq, path in zip(pq_list, files_list)
-        }
-        for future in as_completed(future_to_url):
-            try:
-                future.result()
-            except Exception as e:  # noqa: PERF203
-                raise DownloadError(future_to_url[future], e) from e
 
 
 def get_map(
@@ -371,12 +333,12 @@ def get_map(
     if map_type != "DEM":
         params["renderingRule"] = f'{{"rasterFunction":"{map_type}"}}'
 
-    path = "/arcgis/rest/services/3DEPElevation/ImageServer/exportImage"
+    url = "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage"
     pq_list = [
-        f"{path}?bbox={','.join(str(round(c, 6)) for c in box)}&{urllib.parse.urlencode(params)}"
+        f"{url}?bbox={','.join(str(round(c, 6)) for c in box)}&{urlencode(params)}"
         for box in bbox_list
     ]
-    _download_files(pq_list, tiff_list)
+    stream_write(pq_list, tiff_list)
     return tiff_list
 
 
