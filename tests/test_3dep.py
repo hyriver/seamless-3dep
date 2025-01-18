@@ -7,7 +7,7 @@ import pytest
 import rasterio
 
 import seamless_3dep as sdem
-from seamless_3dep._pools import HTTPSPool, VRTPool
+from seamless_3dep._vrt_pools import VRTPool
 
 
 @pytest.fixture
@@ -160,5 +160,4 @@ def test_3dep_3857():
 def cleanup_after_all_tests():
     """Run cleanup logic at the end of the entire test session."""
     yield  # All tests run before this point
-    HTTPSPool.close()
     VRTPool.close()
