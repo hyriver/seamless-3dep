@@ -386,5 +386,12 @@ def build_vrt(vrt_path: str | Path, tiff_files: list[str] | list[Path]) -> None:
     if not tiff_files or not all(f.exists() for f in tiff_files):
         raise ValueError("No valid files found.")
 
-    command = ["gdalbuildvrt", "-r", "nearest", _path2str(vrt_path), *_path2str(tiff_files)]
+    command = [
+        "gdalbuildvrt",
+        "-r",
+        "nearest",
+        "-overwrite",
+        _path2str(vrt_path),
+        *_path2str(tiff_files),
+    ]
     subprocess.run(command, check=True, text=True, capture_output=True)

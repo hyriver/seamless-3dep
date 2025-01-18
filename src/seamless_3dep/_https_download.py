@@ -2,22 +2,23 @@ from __future__ import annotations
 
 import asyncio
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import aiofiles
 from aiohttp import ClientSession, ClientTimeout, TCPConnector
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Coroutine, Sequence
     from pathlib import Path
 
 __all__ = ["stream_write"]
-CHUNK_SIZE = 1024 * 1024  # Default chunk size of 1 MB
-MAX_HOSTS = 4  # Maximum connections to a single host (rate-limited service)
-TIMEOUT = 10 * 60  # Timeout for requests in seconds
 
 if sys.platform == "win32":  # pragma: no cover
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+CHUNK_SIZE = 1024 * 1024  # Default chunk size of 1 MB
+MAX_HOSTS = 4  # Maximum connections to a single host (rate-limited service)
+TIMEOUT = 10 * 60  # Timeout for requests in seconds
 
 
 class ServiceError(Exception):
@@ -53,37 +54,31 @@ async def _stream_session(urls: Sequence[str], files: Sequence[Path]) -> None:
         connector=TCPConnector(limit_per_host=MAX_HOSTS),
         timeout=ClientTimeout(TIMEOUT),
     ) as session:
-        tasks = [_stream_file(session, url, filepath) for url, filepath in zip(urls, files)]
+        tasks = [
+            asyncio.create_task(_stream_file(session, url, filepath))
+            for url, filepath in zip(urls, files)
+        ]
         await asyncio.gather(*tasks)
 
 
-def is_jupyter_kernel():
-    """Check if the code is running in a Jupyter kernel (not IPython terminal)."""
-    try:
-        from IPython import get_ipython  # pyright: ignore[reportPrivateImportUsage]
-
-        ipython = get_ipython()
-    except (ImportError, NameError):
-        return False
-    if ipython is None:
-        return False
-    return "Terminal" not in ipython.__class__.__name__
-
-
-def _get_or_create_event_loop() -> tuple[asyncio.AbstractEventLoop, bool]:
-    """Create an event loop."""
+def _run_in_event_loop(coro: Coroutine[Any, Any, None]) -> None:
+    """Run an async coroutine in the appropriate event loop."""
     try:
         loop = asyncio.get_running_loop()
-        new_loop = False
+        if loop.is_running():
+            # In Jupyter, add the coroutine to the running loop
+            task = asyncio.ensure_future(coro)
+            # Wait for the task to finish
+            task.add_done_callback(lambda t: t.result())
+        else:
+            loop.run_until_complete(coro)
     except RuntimeError:
         loop = asyncio.new_event_loop()
-        new_loop = True
-    asyncio.set_event_loop(loop)
-    if is_jupyter_kernel():
-        import nest_asyncio
-
-        nest_asyncio.apply(loop)
-    return loop, new_loop
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(coro)
+        finally:
+            loop.close()
 
 
 def stream_write(urls: Sequence[str], file_paths: Sequence[Path]) -> None:
@@ -92,10 +87,4 @@ def stream_write(urls: Sequence[str], file_paths: Sequence[Path]) -> None:
     for parent_dir in parent_dirs:
         parent_dir.mkdir(parents=True, exist_ok=True)
 
-    loop, is_new_loop = _get_or_create_event_loop()
-
-    try:
-        loop.run_until_complete(_stream_session(urls, file_paths))
-    finally:
-        if is_new_loop:
-            loop.close()
+    _run_in_event_loop(_stream_session(urls, file_paths))
