@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import atexit
 import sys
+from threading import Thread
 from typing import TYPE_CHECKING, Any
 
 import aiofiles
@@ -12,13 +14,12 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 __all__ = ["stream_write"]
-
-if sys.platform == "win32":  # pragma: no cover
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-
 CHUNK_SIZE = 1024 * 1024  # Default chunk size of 1 MB
 MAX_HOSTS = 4  # Maximum connections to a single host (rate-limited service)
 TIMEOUT = 10 * 60  # Timeout for requests in seconds
+
+if sys.platform == "win32":  # pragma: no cover
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
 class ServiceError(Exception):
@@ -32,6 +33,41 @@ class ServiceError(Exception):
 
     def __str__(self) -> str:
         return self.message
+
+
+class AsyncLoopThread(Thread):
+    """A thread running an asyncio event loop."""
+
+    def __init__(self):
+        super().__init__(daemon=True)
+        self.loop = asyncio.new_event_loop()
+
+    def run(self):
+        asyncio.set_event_loop(self.loop)
+        try:
+            self.loop.run_forever()
+        finally:
+            # Ensure all asynchronous generators are closed
+            self.loop.run_until_complete(self.loop.shutdown_asyncgens())
+            self.loop.close()
+
+    def stop(self):
+        self.loop.call_soon_threadsafe(self.loop.stop)
+        self.join()
+
+
+# Initialize a single global event loop thread
+_loop_handler = AsyncLoopThread()
+_loop_handler.start()
+# Ensure proper cleanup at application exit
+atexit.register(
+    lambda: _loop_handler.stop() if _loop_handler and _loop_handler.is_alive() else None
+)
+
+
+def _run_in_event_loop(coro: Coroutine[Any, Any, None]) -> None:
+    """Run a coroutine in the dedicated asyncio event loop."""
+    asyncio.run_coroutine_threadsafe(coro, _loop_handler.loop).result()
 
 
 async def _stream_file(session: ClientSession, url: str, filepath: Path) -> None:
@@ -59,26 +95,6 @@ async def _stream_session(urls: Sequence[str], files: Sequence[Path]) -> None:
             for url, filepath in zip(urls, files)
         ]
         await asyncio.gather(*tasks)
-
-
-def _run_in_event_loop(coro: Coroutine[Any, Any, None]) -> None:
-    """Run an async coroutine in the appropriate event loop."""
-    try:
-        loop = asyncio.get_running_loop()
-        if loop.is_running():
-            # In Jupyter, add the coroutine to the running loop
-            task = asyncio.ensure_future(coro)
-            # Wait for the task to finish
-            task.add_done_callback(lambda t: t.result())
-        else:
-            loop.run_until_complete(coro)
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            loop.run_until_complete(coro)
-        finally:
-            loop.close()
 
 
 def stream_write(urls: Sequence[str], file_paths: Sequence[Path]) -> None:
