@@ -18,8 +18,8 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Use `aiohttp` and `aiofiles` for more performant and robust handling of service calls
     and downloading of 3DEP map requests. This should limits the number of connections
     made to the dynamic 3DEP service to avoid hammering the service and can reduce the
-    memory usage when downloading large files. As a results, `aiohttp` and `aiofiles` are
-    now required dependencies and `urllib3` is no longer needed.
+    memory usage when downloading large files. As a results, `aiohttp` and `aiofiles`
+    are now required dependencies and `urllib3` is no longer needed.
 - More robust handling of closing `VRTPool` at exit by creating a new class method
     called `close`. This method is called by the `atexit` module to ensure that the
     pools are closed when the program exits.
