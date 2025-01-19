@@ -11,6 +11,10 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
+- Refactor the package to run in Jupyter notebooks without using `nest_asyncio`. This is
+    done by creating and initializing a single global event loop thread dedicated to
+    only running the asynchronous parts of this package.
+
 ## [0.2.3] - 2025-01-18
 
 ### Changed
