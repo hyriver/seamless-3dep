@@ -228,6 +228,9 @@ exclude_lines = [
   "if TYPE_CHECKING:",
 ]
 ignore_errors = true
+omit = [
+  "**/__init__.py",
+]
 
 [tool.coverage.paths]
 source = [ "src", "*/site-packages" ]
@@ -237,9 +240,6 @@ branch = true
 parallel = true
 source_pkgs = [
   "seamless_3dep",
-]
-omit = [
-  "**/__init__.py",
 ]
 
 [tool.pyright]
