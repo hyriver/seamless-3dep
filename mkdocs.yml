@@ -1,5 +1,5 @@
 site_name: Seamless3DEP
-site_url: https://seamless-3dep.readthedocs.io
+site_url: https://seamless-3dep.readthedocs.io/en/latest/
 
 theme:
   name: material
@@ -91,7 +91,7 @@ markdown_extensions:
     permalink: '#'
 
 extra:
-  homepage: https://seamless-3dep.readthedocs.io
+  homepage: https://seamless-3dep.readthedocs.io/en/latest/
   social:
   - icon: fontawesome/brands/mastodon
     link: https://mastodon.social/@taher
@@ -119,6 +119,7 @@ plugins:
       python:
         import:
         - https://docs.python.org/3/objects.inv
+        - https://docs.aiohttp.org/en/stable/objects.inv
         paths: [seamless_3dep]
         options:
           docstring_style: numpy
