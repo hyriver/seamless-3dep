@@ -1,3 +1,5 @@
+"""Download multiple files concurrently by streaming their content to disk."""
+
 from __future__ import annotations
 
 import asyncio
