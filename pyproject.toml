@@ -46,7 +46,6 @@ optional-dependencies.dev = [
   "matplotlib",
   "pytest",
   "pywbt>=0.2.8",
-  "rasterio>=1.4.3",
   "rioxarray",
 ]
 optional-dependencies.docs = [
@@ -62,7 +61,6 @@ optional-dependencies.lint = [
 ]
 optional-dependencies.test = [
   "coverage[toml]",
-  "pytest",
   "pytest-cov",
   "pytest-sugar",
 ]
@@ -226,6 +224,7 @@ testpaths = [
 [tool.coverage.report]
 exclude_lines = [
   "if TYPE_CHECKING:",
+  "if sys.platform",
 ]
 ignore_errors = true
 omit = [
@@ -244,10 +243,8 @@ source_pkgs = [
 
 [tool.pyright]
 exclude = [
-  ".pixi/",
   "**/__pycache__",
   "**/__init__.py",
-  "tests/",
 ]
 include = [
   "src/seamless_3dep",
