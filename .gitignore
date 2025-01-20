@@ -118,3 +118,4 @@ pixi.lock
 data
 WBT
 .nox
+.markdownlint.json
