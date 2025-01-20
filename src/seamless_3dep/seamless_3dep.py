@@ -76,7 +76,7 @@ def _haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> f
 def decompose_bbox(
     bbox: tuple[float, float, float, float],
     res: int,
-    pixel_max: int | None = MAX_PIXELS,
+    pixel_max: int | None,
     buff_npixels: float = 0.0,
 ) -> tuple[list[tuple[float, float, float, float]], int, int]:
     """Divide a Bbox into equal-area sub-bboxes based on pixel count.
@@ -87,9 +87,9 @@ def decompose_bbox(
         Bounding box coordinates in decimal degrees like so: (west, south, east, north).
     res : int
         Resolution of the domain in meters.
-    pixel_max : int, optional
+    pixel_max : int
         Maximum number of pixels allowed in each sub-bbox. If None, the bbox
-        is not decomposed. Defaults to 8 million.
+        is not decomposed.
     buff_npixels : float, optional
         Number of pixels to buffer each sub-bbox by, defaults to 0.
 
@@ -194,8 +194,10 @@ def get_dem(
         Target resolution of the DEM in meters, by default 10.
         Must be one of 10, 30, or 60.
     pixel_max : int, optional
-        Maximum number of pixels allowed in decomposing the bbox into equal-area
-        sub-bboxes, by default 8 million. If ``None``, the bbox is not decomposed.
+        Maximum number of pixels allowed in each sub-bbox for decomposing the bbox
+        into equal-area sub-bboxes, defaults to 8 million. If ``None``, the bbox
+        is not decomposed and is downloaded as a single file. Values more than
+        8 million are not allowed.
 
     Returns
     -------
@@ -204,6 +206,9 @@ def get_dem(
     """
     if res not in VRTLinks:
         raise ValueError("`res` must be one of 10, 30, or 60 meters.")
+
+    if pixel_max is not None and pixel_max > MAX_PIXELS:
+        raise ValueError(f"`pixel_max` must be less than {MAX_PIXELS}.")
 
     bbox_list, _, _ = decompose_bbox(bbox, res, pixel_max)
 
@@ -247,10 +252,9 @@ def get_map(
     bbox: tuple[float, float, float, float],
     save_dir: str | Path,
     res: int = 10,
-    out_crs: int = 5070,
     pixel_max: int | None = MAX_PIXELS,
 ) -> list[Path]:
-    """Get topo maps within US from 3DEP at any resolution.
+    """Get topo maps in 3857 coordinate system within US from 3DEP at any resolution.
 
     Parameters
     ----------
@@ -275,14 +279,11 @@ def get_map(
         Path to save the GeoTiff files.
     res : int, optional
         Target resolution of the map in meters, by default 10.
-    out_crs : int, optional
-        Coordinate reference system of the output GeoTiff, by default 5070. This must
-        be a well-known ID (WKID) like 3857 or 5070. Do not use 4326 since at the moment
-        the 3DEP web service does not return correct results.
     pixel_max : int, optional
         Maximum number of pixels allowed in each sub-bbox for decomposing the bbox
         into equal-area sub-bboxes, defaults to 8 million. If ``None``, the bbox
-        is not decomposed and is downloaded as a single file.
+        is not decomposed and is downloaded as a single file. Values more than
+        8 million are not allowed.
 
     Returns
     -------
@@ -306,13 +307,8 @@ def get_map(
     if map_type not in valid_types:
         raise ValueError(f"`map_type` must be one of {valid_types}.")
 
-    if not isinstance(out_crs, int):
-        raise TypeError("`out_crs` must be an integer representing WKID.")
-
-    if out_crs == 4326:
-        msg = "`out_crs` cannot be 4326 since 3DEP does not return correct results."
-        msg += " Use a different CRS like 3857 or 5070."
-        raise ValueError(msg)
+    if pixel_max is not None and pixel_max > MAX_PIXELS:
+        raise ValueError(f"`pixel_max` must be less than {MAX_PIXELS}.")
 
     bbox_list, sub_width, sub_height = decompose_bbox(bbox, res, pixel_max)
 
@@ -321,10 +317,10 @@ def get_map(
     save_dir.mkdir(parents=True, exist_ok=True)
 
     rule = map_type.replace(" ", "_").lower()
-    tiff_list = [save_dir / f"{rule}_{_create_hash(box, res, out_crs)}.tiff" for box in bbox_list]
+    tiff_list = [save_dir / f"{rule}_{_create_hash(box, res, 3857)}.tiff" for box in bbox_list]
     params = {
         "bboxSR": 4326,
-        "imageSR": out_crs,
+        "imageSR": 3857,
         "size": f"{sub_width},{sub_height}",
         "format": "tiff",
         "interpolation": "RSP_BilinearInterpolation",

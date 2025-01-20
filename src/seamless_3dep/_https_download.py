@@ -29,7 +29,9 @@ class ServiceError(Exception):
 
     def __init__(self, url: str, err: str) -> None:
         self.message = (
-            f"Service returned the following error:\nURL: {url}\nERROR: {err}" if url else err
+            f"3DEP web service returned the following error:\nURL: {url}\nERROR: {err}"
+            if url
+            else err
         )
         super().__init__(self.message)
 
