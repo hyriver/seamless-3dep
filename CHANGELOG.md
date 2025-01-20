@@ -11,9 +11,18 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
-- Refactor the package to run in Jupyter notebooks without using `nest_asyncio`. This is
+## [0.3.0] - 2025-01-20
+
+### Changed
+
+- Refactor the package to run in Jupyter notebooks without using `nest-asyncio`. This is
     done by creating and initializing a single global event loop thread dedicated to
-    only running the asynchronous parts of this package.
+    only running the asynchronous parts of this package. As a result, `nest-asyncio` is
+    no longer needed as a dependency.
+- Remove the `out_crs` option from `get_map` since the 3DEP service returns inconsistent
+    results when the output CRS is not its default value of 3857. This is a breaking
+    change since this value cannot be configured and the default value has changed from
+    5070 to 3857.
 
 ## [0.2.3] - 2025-01-18
 
