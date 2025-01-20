@@ -55,11 +55,11 @@ processing:
 
 - `get_dem`: Retrieves static DEMs within a specified bounding box. The function
     automatically splits large areas into manageable tiles, downloads data as GeoTIFF
-    files in WGS84 (EPSG:4326), and supports resolutions of 10m, 30m, or 60m.
+    files in EPSG:4326, and supports resolutions of 10m, 30m, or 60m.
 - `get_map`: Fetches any 3DEP product (including DEMs) with customizable parameters.
     Works with all available product types, allows custom resolution settings, and
-    downloads in NAD83 Conus Albers (EPSG:5070) by default. Supports custom projections
-    (except WGS84 due to service limitations).
+    downloads in EPSG:3857. Due to service limitations, the output projection is not
+    configurable.
 - `decompose_bbox`: Handles large area requests by breaking down extensive bounding
     boxes into optimal sizes based on resolution and maximum pixel count, ensuring
     efficient data retrieval.
@@ -73,9 +73,8 @@ processing:
 
 - Bounding box coordinates should be in decimal degrees (WGS84) format: (west, south,
     east, north)
-- Default projection for requesting maps is EPSG:5070 (NAD83 Conus Albers)
-- WGS84 (EPSG:4326) output projection is not supported in `get_map` due to service
-    limitations
+- Default projection for requesting maps is EPSG:3857
+- EPSG:4326 output projection is not supported in `get_map` due to service limitations
 
 ## Installation
 
