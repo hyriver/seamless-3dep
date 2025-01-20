@@ -54,7 +54,7 @@ def test_decompose_bbox_with_division(valid_bbox: tuple[float, float, float, flo
 def test_decompose_bbox_with_buffer():
     """Test decompose_bbox with buffer."""
     bbox = (-122.0, 37.0, -121.0, 38.0)
-    boxes, *_ = sdem.decompose_bbox(bbox, res=30, pixel_max=1000, buff_npixels=2)
+    boxes, *_ = sdem.decompose_bbox(bbox, 30, 1000, buff_npixels=2)
     # Check that boxes overlap due to buffer
     for i in range(len(boxes) - 1):
         current_box = boxes[i]
@@ -71,13 +71,13 @@ def test_decompose_bbox_invalid_resolution():
     """Test decompose_bbox with resolution larger than bbox dimension."""
     bbox = (-122.001, 37.001, -122.0, 37.002)  # Very small bbox
     with pytest.raises(ValueError, match="Resolution must be less"):
-        sdem.decompose_bbox(bbox, res=10000, pixel_max=1000)
+        sdem.decompose_bbox(bbox, 10000, 1000)
 
 
 def test_decompose_bbox_aspect_ratio():
     """Test that decomposed boxes maintain approximate aspect ratio."""
     bbox = (-122.0, 37.0, -121.0, 38.0)
-    boxes, *_ = sdem.decompose_bbox(bbox, res=30, pixel_max=1000)
+    boxes, *_ = sdem.decompose_bbox(bbox, 30, 1000)
 
     # Calculate original aspect ratio
     orig_width = abs(bbox[2] - bbox[0])
@@ -97,7 +97,7 @@ def test_decompose_bbox_aspect_ratio():
 def test_decompose_bbox_coverage():
     """Test that decomposed boxes cover the entire original bbox."""
     bbox = (-122.0, 37.0, -121.0, 38.0)
-    boxes, *_ = sdem.decompose_bbox(bbox, res=30, pixel_max=1000)
+    boxes, *_ = sdem.decompose_bbox(bbox, 30, 1000)
 
     # Convert boxes to set of points for easier comparison
     points_covered = set()
@@ -139,21 +139,12 @@ def test_3dep():
     bbox = (-121.1, 37.9, -121.0, 38.0)
     tiff_files = sdem.get_map("Slope Degrees", bbox, "slope_data", 30, pixel_max=None)
     tiff_files = sdem.get_map("Slope Degrees", bbox, "slope_data", 30)
-    tiff_files = sdem.get_map("Slope Degrees", bbox, "slope_data", 30)
     with rasterio.open(tiff_files[0]) as src:
         assert src.shape == (371, 293)
     tiff_files = sdem.get_map("Slope Degrees", bbox, "slope_data", 30, pixel_max=80000)
     with rasterio.open(tiff_files[0]) as src:
         assert src.shape == (371, 147)
     shutil.rmtree("slope_data", ignore_errors=True)
-
-
-def test_3dep_3857():
-    bbox = (-121.1, 37.9, -121.0, 38.0)
-    tiff_files = sdem.get_map("DEM", bbox, "data_3857", 30, 3857)
-    with rasterio.open(tiff_files[0]) as src:
-        assert src.shape == (371, 293)
-    shutil.rmtree("data_3857", ignore_errors=True)
 
 
 @pytest.fixture(scope="session", autouse=True)
