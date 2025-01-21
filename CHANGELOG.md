@@ -11,6 +11,11 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
+- Use `threading.Event` in `stream_write` for a more robust way to signal the event loop
+    thread to stop running. This should prevent the event loop thread from hanging when
+    the main thread exits before the event loop thread is done running. Overall, this
+    improves thread safety and robustness of the package.
+
 ## [0.3.0] - 2025-01-20
 
 ### Changed
