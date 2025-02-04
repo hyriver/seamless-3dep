@@ -5,8 +5,9 @@ from __future__ import annotations
 import hashlib
 import math
 import os
+import shutil
 import subprocess
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, overload
@@ -19,8 +20,11 @@ from seamless_3dep._https_download import ServiceError, stream_write
 from seamless_3dep._vrt_pools import VRTLinks, VRTPool
 
 if TYPE_CHECKING:
+    from pyproj import CRS
     from rasterio.io import DatasetReader
     from rasterio.transform import Affine
+    from shapely import Polygon
+    from xarray import DataArray
 
     MapTypes = Literal[
         "DEM",
@@ -36,18 +40,20 @@ if TYPE_CHECKING:
         "Contour 25",
         "Contour Smoothed 25",
     ]
+    CRSType = int | str | CRS
 
-__all__ = ["build_vrt", "decompose_bbox", "get_dem", "get_map"]
+__all__ = ["build_vrt", "decompose_bbox", "get_dem", "get_map", "tiffs_to_da"]
 
 MAX_PIXELS = 8_000_000
 
 
-def _check_bbox(bbox: tuple[float, float, float, float]) -> None:
+def _check_bbox(bbox: Sequence[float]) -> tuple[float, float, float, float]:
     """Validate that bbox is in correct form."""
-    if not (isinstance(bbox, Iterable) and len(bbox) == 4 and all(map(math.isfinite, bbox))):
+    if not (isinstance(bbox, Sequence) and len(bbox) == 4 and all(map(math.isfinite, bbox))):
         raise TypeError(
             "`bbox` must be a tuple of form (west, south, east, north) in decimal degrees."
         )
+    return (bbox[0], bbox[1], bbox[2], bbox[3])
 
 
 def _check_bounds(
@@ -74,7 +80,7 @@ def _haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> f
 
 
 def decompose_bbox(
-    bbox: tuple[float, float, float, float],
+    bbox: Sequence[float],
     res: int,
     pixel_max: int | None,
     buff_npixels: float = 0.0,
@@ -102,8 +108,7 @@ def decompose_bbox(
     sub_height : int
         Height of each sub-bbox in degrees.
     """
-    _check_bbox(bbox)
-    west, south, east, north = bbox
+    west, south, east, north = _check_bbox(bbox)
     x_dist = _haversine_distance(south, west, south, east)
     y_dist = _haversine_distance(south, west, north, west)
 
@@ -113,7 +118,7 @@ def decompose_bbox(
     width = math.ceil(x_dist / res)
     height = math.ceil(y_dist / res)
     if pixel_max is None or width * height <= pixel_max:
-        return [bbox], width, height
+        return [(west, south, east, north)], width, height
 
     # Divisions in each direction maintaining aspect ratio
     aspect_ratio = width / height
@@ -172,7 +177,7 @@ def _create_hash(box: tuple[float, float, float, float], res: int, crs: int) -> 
 
 
 def get_dem(
-    bbox: tuple[float, float, float, float],
+    bbox: Sequence[float],
     save_dir: str | Path,
     res: Literal[10, 30, 60] = 10,
     pixel_max: int | None = MAX_PIXELS,
@@ -210,6 +215,7 @@ def get_dem(
     if pixel_max is not None and pixel_max > MAX_PIXELS:
         raise ValueError(f"`pixel_max` must be less than {MAX_PIXELS}.")
 
+    bbox = _check_bbox(bbox)
     bbox_list, _, _ = decompose_bbox(bbox, res, pixel_max)
 
     vrt_pool = VRTPool.get_dataset_reader(res)
@@ -249,7 +255,7 @@ def get_dem(
 
 def get_map(
     map_type: MapTypes,
-    bbox: tuple[float, float, float, float],
+    bbox: Sequence[float],
     save_dir: str | Path,
     res: int = 10,
     pixel_max: int | None = MAX_PIXELS,
@@ -310,6 +316,7 @@ def get_map(
     if pixel_max is not None and pixel_max > MAX_PIXELS:
         raise ValueError(f"`pixel_max` must be less than {MAX_PIXELS}.")
 
+    bbox = _check_bbox(bbox)
     bbox_list, sub_width, sub_height = decompose_bbox(bbox, res, pixel_max)
 
     _check_bounds(bbox, (-180.0, -15.0, 180.0, 84.0))
@@ -372,8 +379,7 @@ def build_vrt(vrt_path: str | Path, tiff_files: list[str] | list[Path]) -> None:
     tiff_files : list of str or Path
         List of file paths to include in the VRT.
     """
-    exit_code, _ = subprocess.getstatusoutput("gdalinfo --version")
-    if exit_code != 0:
+    if shutil.which("gdalbuildvrt") is None:
         raise ImportError("GDAL (`libgdal-core`) is required to run `build_vrt`.")
 
     vrt_path = Path(vrt_path).resolve()
@@ -390,4 +396,65 @@ def build_vrt(vrt_path: str | Path, tiff_files: list[str] | list[Path]) -> None:
         _path2str(vrt_path),
         *_path2str(tiff_files),
     ]
-    subprocess.run(command, check=True, text=True, capture_output=True)
+    try:
+        subprocess.run(command, check=True, text=True, capture_output=True)
+    except subprocess.CalledProcessError as e:
+        msg = f"Command '{' '.join(e.cmd)}' failed with error:\n{e.stderr.strip()}"
+        raise RuntimeError(msg) from e
+
+
+def tiffs_to_da(
+    tiff_files: list[Path], geometry: Polygon | Sequence[float], crs: CRSType = 4326
+) -> DataArray:
+    """Convert a list of tiff files to a vrt file and return a xarray.DataArray.
+
+    Parameters
+    ----------
+    tiff_files : list of Path
+        List of file paths to convert to a DataArray.
+    geometry : Polygon or Sequence
+        Polygon or bounding box in the form (west, south, east, north).
+    crs : int, str, or CRS, optional
+        Coordinate reference system of the input geometry, by default 4326.
+
+    Returns
+    -------
+    xarray.DataArray
+        DataArray containing the clipped data.
+    """
+    try:
+        import rioxarray as rxr
+        import shapely
+    except ImportError as e:
+        msg = "This function requires `shapely` and `rioxarray` to be installed."
+        raise ImportError(msg) from e
+
+    if not isinstance(tiff_files, Iterable):
+        raise TypeError("`tiff_files` must be an iterable of file paths.")
+
+    if isinstance(geometry, shapely.Polygon):
+        geom = geometry
+    elif isinstance(geometry, Sequence):
+        geom = shapely.box(*_check_bbox(geometry))
+    else:
+        raise TypeError(
+            "`geometry` must be a shapely Polygon or an iterable of form (west, south, east, north)."
+        )
+
+    tiff_files = [Path(f).resolve() for f in tiff_files]
+
+    if not tiff_files or not all(f.exists() for f in tiff_files):
+        raise ValueError("No valid files found.")
+
+    first = tiff_files[0]
+    if len(tiff_files) == 1:
+        file = first
+    else:
+        file = first.with_suffix(".vrt")
+        build_vrt(file, tiff_files)
+    return (
+        rxr.open_rasterio(file)
+        .squeeze(drop=True)
+        .rio.clip_box(*geom.bounds, crs=crs)
+        .rio.clip([geom], crs=crs)
+    )
