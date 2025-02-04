@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import pytest
 import rasterio
+import shapely
 
-import seamless_3dep as sdem
+import seamless_3dep as s3dep
 from seamless_3dep._vrt_pools import VRTPool
 
 
@@ -29,7 +31,7 @@ def test_decompose_bbox_no_division(
     valid_bbox: tuple[float, float, float, float], small_res: int, pixel_max: int
 ):
     """Test when bbox is small enough to not require division."""
-    boxes, *_ = sdem.decompose_bbox(valid_bbox, small_res, pixel_max * 100)
+    boxes, *_ = s3dep.decompose_bbox(valid_bbox, small_res, pixel_max * 100)
     assert len(boxes) == 1
     assert boxes[0] == valid_bbox
 
@@ -38,7 +40,7 @@ def test_decompose_bbox_with_division(valid_bbox: tuple[float, float, float, flo
     """Test when bbox needs to be divided."""
     # Use small pixel_max to force division
     small_pixel_max = 1000
-    boxes, *_ = sdem.decompose_bbox(valid_bbox, 30, small_pixel_max)
+    boxes, *_ = s3dep.decompose_bbox(valid_bbox, 30, small_pixel_max)
     assert len(boxes) > 1
 
     # Check that all boxes are within original bbox
@@ -54,7 +56,7 @@ def test_decompose_bbox_with_division(valid_bbox: tuple[float, float, float, flo
 def test_decompose_bbox_with_buffer():
     """Test decompose_bbox with buffer."""
     bbox = (-122.0, 37.0, -121.0, 38.0)
-    boxes, *_ = sdem.decompose_bbox(bbox, 30, 1000, buff_npixels=2)
+    boxes, *_ = s3dep.decompose_bbox(bbox, 30, 1000, buff_npixels=2)
     # Check that boxes overlap due to buffer
     for i in range(len(boxes) - 1):
         current_box = boxes[i]
@@ -71,13 +73,13 @@ def test_decompose_bbox_invalid_resolution():
     """Test decompose_bbox with resolution larger than bbox dimension."""
     bbox = (-122.001, 37.001, -122.0, 37.002)  # Very small bbox
     with pytest.raises(ValueError, match="Resolution must be less"):
-        sdem.decompose_bbox(bbox, 10000, 1000)
+        s3dep.decompose_bbox(bbox, 10000, 1000)
 
 
 def test_decompose_bbox_aspect_ratio():
     """Test that decomposed boxes maintain approximate aspect ratio."""
     bbox = (-122.0, 37.0, -121.0, 38.0)
-    boxes, *_ = sdem.decompose_bbox(bbox, 30, 1000)
+    boxes, *_ = s3dep.decompose_bbox(bbox, 30, 1000)
 
     # Calculate original aspect ratio
     orig_width = abs(bbox[2] - bbox[0])
@@ -97,7 +99,7 @@ def test_decompose_bbox_aspect_ratio():
 def test_decompose_bbox_coverage():
     """Test that decomposed boxes cover the entire original bbox."""
     bbox = (-122.0, 37.0, -121.0, 38.0)
-    boxes, *_ = sdem.decompose_bbox(bbox, 30, 1000)
+    boxes, *_ = s3dep.decompose_bbox(bbox, 30, 1000)
 
     # Convert boxes to set of points for easier comparison
     points_covered = set()
@@ -120,31 +122,56 @@ def test_decompose_bbox_coverage():
 
 def test_dem_and_vrt():
     bbox = (-121.1, 37.9, -121.0, 38.0)
-    tiff_files = sdem.get_dem(bbox, "dem_data", 30)
-    tiff_files = sdem.get_dem(bbox, "dem_data", 30)
+    tiff_files = s3dep.get_dem(bbox, "dem_data", 30)
+    tiff_files = s3dep.get_dem(bbox, "dem_data", 30)
     tiff_files[0].unlink()
-    tiff_files = sdem.get_dem(bbox, "dem_data", 30, pixel_max=None)
+    tiff_files = s3dep.get_dem(bbox, "dem_data", 30, pixel_max=None)
     with rasterio.open(tiff_files[0]) as src:
         assert src.shape == (359, 359)
-    tiff_files = sdem.get_dem(bbox, "dem_data", 30, pixel_max=80000)
+    tiff_files = s3dep.get_dem(bbox, "dem_data", 30, pixel_max=80000)
     with rasterio.open(tiff_files[0]) as src:
         assert src.shape == (359, 179)
     vrt_file = Path("dem_data", "dem.vrt")
-    sdem.build_vrt(vrt_file, tiff_files)
+    s3dep.build_vrt(vrt_file, tiff_files)
     assert vrt_file.stat().st_size == 1701
+    dem = s3dep.tiffs_to_da(tiff_files, bbox, 4326)
+    assert dem.shape == (359, 359)
+    dem = s3dep.tiffs_to_da(tiff_files, shapely.box(*bbox), 4326)
+    assert dem.shape == (359, 359)
     shutil.rmtree("dem_data", ignore_errors=True)
 
 
 def test_3dep():
     bbox = (-121.1, 37.9, -121.0, 38.0)
-    tiff_files = sdem.get_map("Slope Degrees", bbox, "slope_data", 30, pixel_max=None)
-    tiff_files = sdem.get_map("Slope Degrees", bbox, "slope_data", 30)
+    tiff_files = s3dep.get_map("Slope Degrees", bbox, "slope_data", 30, pixel_max=None)
+    tiff_files = s3dep.get_map("Slope Degrees", bbox, "slope_data", 30)
     with rasterio.open(tiff_files[0]) as src:
         assert src.shape == (371, 293)
-    tiff_files = sdem.get_map("Slope Degrees", bbox, "slope_data", 30, pixel_max=80000)
+    tiff_files = s3dep.get_map("Slope Degrees", bbox, "slope_data", 30, pixel_max=80000)
     with rasterio.open(tiff_files[0]) as src:
         assert src.shape == (371, 147)
     shutil.rmtree("slope_data", ignore_errors=True)
+
+
+def test_build_vrt_failure():
+    """Test that `build_vrt` raises an error when given empty TIFF files."""
+    with TemporaryDirectory() as tmpdir:
+        vrt_path = Path(tmpdir) / "output.vrt"
+        tiff1 = Path(tmpdir) / "empty1.tif"
+        tiff1.touch()
+        tiff2 = Path(tmpdir) / "empty2.tif"
+        tiff2.touch()
+        tiff3 = Path(tmpdir) / "empty3.tif"
+
+        with pytest.raises(RuntimeError) as excinfo:
+            s3dep.build_vrt(vrt_path, [tiff1, tiff2])
+
+        assert "Command 'gdalbuildvrt" in str(excinfo.value)
+
+        with pytest.raises(ValueError, match="No valid") as excinfo:
+            s3dep.build_vrt(vrt_path, [tiff1, tiff2, tiff3])
+
+        assert "No valid files" in str(excinfo.value)
 
 
 @pytest.fixture(scope="session", autouse=True)
