@@ -68,6 +68,10 @@ processing:
     areas. Note that `libgdal-core` is an optional dependency and is not installed when
     `seamless-3dep` is installed from PyPI. However, it is installed as a dependency
     when `seamless-3dep` is installed from `conda-forge`.
+- `tiffs_to_da`: Converts a list of GeoTIFF files to an `xarray.DataArray` object. This
+    function is useful for combining multiple GeoTIFF files that `get_map` and `get_dem`
+    produce into a single `xarray.DataArray` object for further analysis. Note that for
+    using this function, `shapely` and `rioxarray` need to be installed.
 
 ## Important Notes
 
@@ -103,7 +107,7 @@ we can visualize or even reproject the data using `rioxarray`.
 
 ```python
 from pathlib import Path
-import seamless_3dep as sdem
+import seamless_3dep as s3dep
 import rioxarray as rxr
 
 # Define area of interest (west, south, east, north)
@@ -111,17 +115,10 @@ bbox = (-105.7006276, 39.8472777, -104.869054, 40.298293)
 data_dir = Path("data")
 
 # Download DEM
-tiff_files = sdem.get_dem(bbox, data_dir)
+tiff_files = s3dep.get_dem(bbox, data_dir)
 
-# Handle single or multiple tiles
-if len(tiff_files) == 1:
-    dem_file = tiff_files[0]
-else:
-    dem_file = data_dir / "dem.vrt"
-    sdem.build_vrt(dem_file, tiff_files)
-
-# Open with rioxarray
-dem = rxr.open_rasterio(dem_file).squeeze(drop=True)
+# Convert to xarray.DataArray
+dem = s3dep.tiffs_to_da(tiff_files, bbox, crs=4326)
 ```
 
 ![DEM Example](https://raw.githubusercontent.com/hyriver/seamless-3dep/main/docs/examples/images/dem.png)
@@ -129,7 +126,8 @@ dem = rxr.open_rasterio(dem_file).squeeze(drop=True)
 ### Retrieving a Slope Map
 
 ```python
-slope_files = sdem.get_map("Slope Degrees", bbox, data_dir)
+slope_files = s3dep.get_map("Slope Degrees", bbox, data_dir)
+dem = s3dep.tiffs_to_da(slope_files, bbox)
 ```
 
 ![Slope Example](https://raw.githubusercontent.com/hyriver/seamless-3dep/main/docs/examples/images/slope_dynamic.png)
