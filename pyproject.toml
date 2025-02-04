@@ -63,6 +63,8 @@ optional-dependencies.test = [
   "coverage[toml]",
   "pytest-cov",
   "pytest-sugar",
+  "rioxarray",
+  "shapely",
 ]
 optional-dependencies.typecheck = [
   "pyright",
