@@ -1,11 +1,11 @@
-"""Top-level package for SeamlessDEM."""
+"""Top-level package for Seamless3dep."""
 
 from __future__ import annotations
 
 from importlib.metadata import PackageNotFoundError, version
 
 from seamless_3dep._https_download import ServiceError
-from seamless_3dep.seamless_3dep import build_vrt, decompose_bbox, get_dem, get_map
+from seamless_3dep.seamless_3dep import build_vrt, decompose_bbox, get_dem, get_map, tiffs_to_da
 
 try:
     __version__ = version("seamless_3dep")
@@ -19,4 +19,5 @@ __all__ = [
     "decompose_bbox",
     "get_dem",
     "get_map",
+    "tiffs_to_da",
 ]
