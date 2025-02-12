@@ -35,9 +35,8 @@ dynamic = [
   "version",
 ]
 dependencies = [
-  "aiofiles",
-  "aiohttp>=3.8.3",
   "rasterio",
+  "tiny-retriever>=0.1.1",
 ]
 optional-dependencies.dev = [
   "geopandas>=1",
