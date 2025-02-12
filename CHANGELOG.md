@@ -9,6 +9,12 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
+### Changed
+
+## [0.3.1] - 2025-02-12
+
+### Added
+
 - Add a new function called `tiffs_to_da` that converts a list of GeoTIFF files to a
     `xarray.DataArray` object. This function is useful for combining multiple GeoTIFF
     files that `get_map` and `get_dem` produce, into a single `xarray.DataArray` object
@@ -18,10 +24,10 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
-- Use `threading.Event` in `stream_write` for a more robust way to signal the event loop
-    thread to stop running. This should prevent the event loop thread from hanging when
-    the main thread exits before the event loop thread is done running. Overall, this
-    improves thread safety and robustness of the package.
+- Switch to using the new
+    [TinyRetriever](https://tiny-retriever.readthedocs.io/en/latest/) library that was
+    developed partly based on this package. It has the same two dependencies and
+    includes the same functionality with some additional features.
 - Improve handling of errors when using `build_vrt` function by explicitly catching
     errors raised by `gdalbuildvrt` and raising a more informative error message. This
     should make it easier to debug issues when creating VRT files.
