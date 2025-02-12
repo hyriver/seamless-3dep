@@ -15,8 +15,9 @@ from urllib.parse import urlencode
 
 import rasterio
 import rasterio.windows
+import tiny_retriever as terry
+from tiny_retriever.exceptions import ServiceError
 
-from seamless_3dep._https_download import ServiceError, stream_write
 from seamless_3dep._vrt_pools import VRTLinks, VRTPool
 
 if TYPE_CHECKING:
@@ -341,7 +342,7 @@ def get_map(
         f"{url}?bbox={','.join(str(round(c, 6)) for c in box)}&{urlencode(params)}"
         for box in bbox_list
     ]
-    stream_write(pq_list, tiff_list)
+    terry.download(pq_list, tiff_list)
     return tiff_list
 
 
