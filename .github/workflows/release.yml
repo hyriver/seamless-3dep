@@ -16,7 +16,7 @@ jobs:
     name: Create Release Notes
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: Generate Changelog
       run: |-
         echo "# Release Notes" > ${{ github.workflow }}-CHANGELOG.md
@@ -44,7 +44,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: release-notes
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         fetch-depth: 0
 
