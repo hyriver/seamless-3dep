@@ -77,10 +77,10 @@ typecheck = [
   "xarray",
 ]
 [project.urls]
-Changelog = "https://hyriver.github.io/seamless-3dep/latest/CHANGELOG/"
+Changelog = "https://docs.hyriver.io/seamless-3dep/latest/CHANGELOG/"
 CI = "https://github.com/hyriver/seamless-3dep/actions"
-Documentation = "https://hyriver.github.io/seamless-3dep"
-Homepage = "https://hyriver.github.io/seamless-3dep"
+Documentation = "https://docs.hyriver.io/seamless-3dep"
+Homepage = "https://docs.hyriver.io/seamless-3dep"
 Issues = "https://github.com/hyriver/seamless-3dep/issues"
 
 [tool.hatch.build.targets.wheel]

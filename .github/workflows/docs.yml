@@ -34,8 +34,12 @@ jobs:
 
     - name: Deploy dev docs
       if: github.ref == 'refs/heads/main'
-      run: pixi r docs-deploy
+      run: |-
+        pixi r docs-deploy
+        mike set-default --push latest
 
     - name: Deploy release docs
       if: startsWith(github.ref, 'refs/tags/v')
-      run: pixi r docs-release
+      run: |-
+        pixi r docs-release
+        mike set-default --push stable

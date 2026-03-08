@@ -33,7 +33,7 @@ experience for all involved. The community looks forward to your contributions. 
 ## I Have a Question
 
 > If you want to ask a question, we assume that you have read the available
-> [Documentation](https://hyriver.github.io/seamless-3dep).
+> [Documentation](https://docs.hyriver.io/seamless-3dep).
 
 Before you ask a question, it is best to search for existing
 [Issues](https://github.com/hyriver/seamless-3dep/issues) that might help you. In case
@@ -72,7 +72,7 @@ us fix any potential bug as fast as possible.
 - Make sure that you are using the latest version.
 - Determine if your bug is really a bug and not an error on your side e.g. using
     incompatible environment components/versions (Make sure that you have read the
-    [documentation](https://hyriver.github.io/seamless-3dep). If you are looking for
+    [documentation](https://docs.hyriver.io/seamless-3dep). If you are looking for
     support, you might want to check [this section](#i-have-a-question)).
 - To see if other users have experienced (and potentially already solved) the same issue
     you are having, check if there is not already a bug report existing for your bug or
@@ -133,7 +133,7 @@ suggestion and find related suggestions.
 #### Before Submitting an Enhancement
 
 - Make sure that you are using the latest version.
-- Read the [documentation](https://hyriver.github.io/seamless-3dep) carefully and find
+- Read the [documentation](https://docs.hyriver.io/seamless-3dep) carefully and find
     out if the functionality is already covered, maybe by an individual configuration.
 - Perform a [search](https://github.com/hyriver/seamless-3dep/issues) to see if the
     enhancement has already been suggested. If it has, add a comment to the existing

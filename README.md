@@ -22,7 +22,7 @@ calls and minimize redundant connections. This reduces both the service load and
 time required to retrieve data, making it an ideal tool for handling large-scale
 topographic data requests.
 
-📚 Full documentation is available [here](https://hyriver.github.io/seamless-3dep).
+📚 Full documentation is available [here](https://docs.hyriver.io/seamless-3dep).
 
 ## Available Products
 
@@ -139,5 +139,5 @@ dem = s3dep.tiffs_to_da(slope_files, bbox)
 ## Contributing
 
 We welcome contributions! Please see the
-[contributing](https://hyriver.github.io/seamless-3dep/latest/CONTRIBUTING/) section for
+[contributing](https://docs.hyriver.io/seamless-3dep/latest/CONTRIBUTING/) section for
 guidelines and instructions.
