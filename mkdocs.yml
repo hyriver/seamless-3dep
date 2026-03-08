@@ -1,5 +1,5 @@
 site_name: Seamless3DEP
-site_url: https://hyriver.github.io/seamless-3dep/
+site_url: https://docs.hyriver.io/seamless-3dep/
 
 theme:
   name: materialx
@@ -90,7 +90,7 @@ markdown_extensions:
     permalink: '#'
 
 extra:
-  homepage: https://hyriver.github.io/seamless-3dep/
+  homepage: https://docs.hyriver.io/seamless-3dep/
   version:
     provider: mike
   social:

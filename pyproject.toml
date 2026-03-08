@@ -77,10 +77,10 @@ typecheck = [
   "xarray",
 ]
 [project.urls]
-Changelog = "https://hyriver.github.io/seamless-3dep/latest/CHANGELOG/"
+Changelog = "https://docs.hyriver.io/seamless-3dep/latest/CHANGELOG/"
 CI = "https://github.com/hyriver/seamless-3dep/actions"
-Documentation = "https://hyriver.github.io/seamless-3dep"
-Homepage = "https://hyriver.github.io/seamless-3dep"
+Documentation = "https://docs.hyriver.io/seamless-3dep"
+Homepage = "https://docs.hyriver.io/seamless-3dep"
 Issues = "https://github.com/hyriver/seamless-3dep/issues"
 
 [tool.hatch.build.targets.wheel]
@@ -276,7 +276,7 @@ nbconvert = ">=7.17.0,<8"
 [tool.pixi.feature.docs.tasks]
 docs-build = "mkdocs build --strict"
 docs-serve = { cmd = "mkdocs serve", depends-on = [ "docs-build" ] }
-docs-deploy = "mike deploy --push --update-aliases dev latest"
+docs-deploy = "mike deploy --push latest"
 docs-release = "mike deploy --push --update-aliases $(git describe --tags --abbrev=0) stable"
 [tool.pixi.feature.lint.tasks]
 lint = "pre-commit run --all-files"

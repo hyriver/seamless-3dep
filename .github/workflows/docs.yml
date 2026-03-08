@@ -32,10 +32,12 @@ jobs:
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
 
-    - name: Deploy dev docs
+    - name: Deploy latest docs (main branch)
       if: github.ref == 'refs/heads/main'
       run: pixi r docs-deploy
 
-    - name: Deploy release docs
+    - name: Deploy release docs (tagged version)
       if: startsWith(github.ref, 'refs/tags/v')
-      run: pixi r docs-release
+      run: |-
+        pixi r docs-release
+        mike set-default --push stable
