@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -120,37 +119,37 @@ def test_decompose_bbox_coverage():
     assert orig_points.issubset(points_covered)
 
 
-def test_dem_and_vrt():
+def test_dem_and_vrt(tmp_path):
     bbox = (-121.1, 37.9, -121.0, 38.0)
-    tiff_files = s3dep.get_dem(bbox, "dem_data", 30)
-    tiff_files = s3dep.get_dem(bbox, "dem_data", 30)
+    dem_dir = tmp_path / "dem_data"
+    tiff_files = s3dep.get_dem(bbox, dem_dir, 30)
+    tiff_files = s3dep.get_dem(bbox, dem_dir, 30)
     tiff_files[0].unlink()
-    tiff_files = s3dep.get_dem(bbox, "dem_data", 30, pixel_max=None)
+    tiff_files = s3dep.get_dem(bbox, dem_dir, 30, pixel_max=None)
     with rasterio.open(tiff_files[0]) as src:
         assert src.shape == (359, 359)
-    tiff_files = s3dep.get_dem(bbox, "dem_data", 30, pixel_max=80000)
+    tiff_files = s3dep.get_dem(bbox, dem_dir, 30, pixel_max=80000)
     with rasterio.open(tiff_files[0]) as src:
         assert src.shape == (359, 179)
-    vrt_file = Path("dem_data", "dem.vrt")
+    vrt_file = dem_dir / "dem.vrt"
     s3dep.build_vrt(vrt_file, tiff_files)
     assert vrt_file.stat().st_size == 1701
     dem = s3dep.tiffs_to_da(tiff_files, bbox, 4326)
     assert dem.shape == (359, 359)
     dem = s3dep.tiffs_to_da(tiff_files, shapely.box(*bbox), 4326)
     assert dem.shape == (359, 359)
-    shutil.rmtree("dem_data", ignore_errors=True)
 
 
-def test_3dep():
+def test_3dep(tmp_path):
     bbox = (-121.1, 37.9, -121.0, 38.0)
-    tiff_files = s3dep.get_map("Slope Degrees", bbox, "slope_data", 30, pixel_max=None)
-    tiff_files = s3dep.get_map("Slope Degrees", bbox, "slope_data", 30)
+    slope_dir = tmp_path / "slope_data"
+    tiff_files = s3dep.get_map("Slope Degrees", bbox, slope_dir, 30, pixel_max=None)
+    tiff_files = s3dep.get_map("Slope Degrees", bbox, slope_dir, 30)
     with rasterio.open(tiff_files[0]) as src:
         assert src.shape == (371, 293)
-    tiff_files = s3dep.get_map("Slope Degrees", bbox, "slope_data", 30, pixel_max=80000)
+    tiff_files = s3dep.get_map("Slope Degrees", bbox, slope_dir, 30, pixel_max=80000)
     with rasterio.open(tiff_files[0]) as src:
         assert src.shape == (371, 147)
-    shutil.rmtree("slope_data", ignore_errors=True)
 
 
 def test_build_vrt_failure():

@@ -7,20 +7,25 @@ import math
 import os
 import shutil
 import subprocess
-from collections.abc import Iterable, Sequence
+from collections.abc import Generator, Iterable, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from itertools import islice, product
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, overload
+from typing import TYPE_CHECKING, Literal, cast, overload
 from urllib.parse import urlencode
 
+import numpy as np
 import rasterio
 import rasterio.windows
 import tiny_retriever as terry
+from rasterio.enums import MaskFlags, Resampling
+from rasterio.transform import rowcol
 from tiny_retriever.exceptions import ServiceError
 
 from seamless_3dep._vrt_pools import VRTLinks, VRTPool
 
 if TYPE_CHECKING:
+    from numpy.typing import ArrayLike, NDArray
     from pyproj import CRS
     from rasterio.io import DatasetReader
     from rasterio.transform import Affine
@@ -43,9 +48,23 @@ if TYPE_CHECKING:
     ]
     CRSType = int | str | CRS
 
-__all__ = ["build_vrt", "decompose_bbox", "get_dem", "get_map", "tiffs_to_da"]
+__all__ = ["build_vrt", "decompose_bbox", "elevation_bygrid", "get_dem", "get_map", "tiffs_to_da"]
 
 MAX_PIXELS = 8_000_000
+VALID_MAP_TYPES = (
+    "DEM",
+    "Hillshade Gray",
+    "Aspect Degrees",
+    "Aspect Map",
+    "GreyHillshade_elevationFill",
+    "Hillshade Multidirectional",
+    "Slope Map",
+    "Slope Degrees",
+    "Hillshade Elevation Tinted",
+    "Height Ellipsoidal",
+    "Contour 25",
+    "Contour Smoothed 25",
+)
 
 
 def _check_bbox(bbox: Sequence[float]) -> tuple[float, float, float, float]:
@@ -147,7 +166,7 @@ def decompose_bbox(
 
 
 def _clip_3dep(
-    vrt_pool: DatasetReader,
+    vrt_url: str,
     box: tuple[float, float, float, float],
     tiff_path: Path,
     transform: Affine,
@@ -156,17 +175,18 @@ def _clip_3dep(
     """Clip 3DEP to a bbox and save it as a GeoTiff file with NaN as nodata."""
     if not tiff_path.exists():
         window = rasterio.windows.from_bounds(*box, transform=transform)
-        meta = vrt_pool.meta.copy()
-        meta.update(
-            {
-                "driver": "GTiff",
-                "height": window.height,
-                "width": window.width,
-                "transform": rasterio.windows.transform(window, transform),
-                "nodata": math.nan,
-            }
-        )
-        data = vrt_pool.read(window=window)
+        with rasterio.open(vrt_url) as src:
+            meta = src.meta.copy()
+            meta.update(
+                {
+                    "driver": "GTiff",
+                    "height": window.height,
+                    "width": window.width,
+                    "transform": rasterio.windows.transform(window, transform),
+                    "nodata": math.nan,
+                }
+            )
+            data = src.read(window=window)
         data[data == nodata] = math.nan
         with rasterio.open(tiff_path, "w", **meta) as dst:
             dst.write(data)
@@ -219,7 +239,6 @@ def get_dem(
     bbox = _check_bbox(bbox)
     bbox_list, _, _ = decompose_bbox(bbox, res, pixel_max)
 
-    vrt_pool = VRTPool.get_dataset_reader(res)
     vrt_info = VRTPool.get_vrt_info(res)
     _check_bounds(bbox, vrt_info.bounds)
 
@@ -230,27 +249,26 @@ def get_dem(
     if all(tiff.exists() for tiff in tiff_list):
         return tiff_list
 
+    vrt_url = VRTLinks[res]
     max_workers = min(4, os.cpu_count() or 1, len(bbox_list))
     if max_workers == 1:
-        _ = [
-            _clip_3dep(vrt_pool, box, path, vrt_info.transform, vrt_info.nodata)
-            for box, path in zip(bbox_list, tiff_list)
-        ]
+        for box, path in zip(bbox_list, tiff_list, strict=True):
+            _clip_3dep(vrt_url, box, path, vrt_info.transform, vrt_info.nodata)
         return tiff_list
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_url = {
-            executor.submit(_clip_3dep, vrt_pool, box, path, vrt_info.transform, vrt_info.nodata): (
+            executor.submit(_clip_3dep, vrt_url, box, path, vrt_info.transform, vrt_info.nodata): (
                 box,
                 path,
             )
-            for box, path in zip(bbox_list, tiff_list)
+            for box, path in zip(bbox_list, tiff_list, strict=True)
         }
         for future in as_completed(future_to_url):
             try:
                 future.result()
             except Exception as e:  # noqa: PERF203
-                raise ServiceError(str(e), VRTLinks[res]) from e
+                raise ServiceError(str(e), vrt_url) from e
     return tiff_list
 
 
@@ -297,22 +315,8 @@ def get_map(
     list of pathlib.Path
         list of GeoTiff files containing the DEM clipped to the bounding box.
     """
-    valid_types = (
-        "DEM",
-        "Hillshade Gray",
-        "Aspect Degrees",
-        "Aspect Map",
-        "GreyHillshade_elevationFill",
-        "Hillshade Multidirectional",
-        "Slope Map",
-        "Slope Degrees",
-        "Hillshade Elevation Tinted",
-        "Height Ellipsoidal",
-        "Contour 25",
-        "Contour Smoothed 25",
-    )
-    if map_type not in valid_types:
-        raise ValueError(f"`map_type` must be one of {valid_types}.")
+    if map_type not in VALID_MAP_TYPES:
+        raise ValueError(f"`map_type` must be one of {VALID_MAP_TYPES}.")
 
     if pixel_max is not None and pixel_max > MAX_PIXELS:
         raise ValueError(f"`pixel_max` must be less than {MAX_PIXELS}.")
@@ -326,6 +330,9 @@ def get_map(
 
     rule = map_type.replace(" ", "_").lower()
     tiff_list = [save_dir / f"{rule}_{_create_hash(box, res, 3857)}.tiff" for box in bbox_list]
+    if all(tiff.exists() for tiff in tiff_list):
+        return tiff_list
+
     params = {
         "bboxSR": 4326,
         "imageSR": 3857,
@@ -338,10 +345,8 @@ def get_map(
         params["renderingRule"] = f'{{"rasterFunction":"{map_type}"}}'
 
     url = "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage"
-    pq_list = [
-        f"{url}?bbox={','.join(str(round(c, 6)) for c in box)}&{urlencode(params)}"
-        for box in bbox_list
-    ]
+    qs = urlencode(params)
+    pq_list = [f"{url}?bbox={','.join(str(round(c, 6)) for c in box)}&{qs}" for box in bbox_list]
     terry.download(pq_list, tiff_list)
     return tiff_list
 
@@ -424,19 +429,20 @@ def tiffs_to_da(
         DataArray containing the clipped data.
     """
     try:
-        import rioxarray as rxr
-        import shapely
+        import rioxarray as rxr  # noqa: PLC0415
+        import shapely  # noqa: PLC0415
     except ImportError as e:
-        msg = "This function requires `shapely` and `rioxarray` to be installed."
+        msg = "`tiffs_to_da` requires `shapely` and `rioxarray` to be installed."
         raise ImportError(msg) from e
 
     if not isinstance(tiff_files, Iterable):
         raise TypeError("`tiff_files` must be an iterable of file paths.")
 
-    if isinstance(geometry, shapely.Polygon):
-        geom = geometry
-    elif isinstance(geometry, Sequence):
+    is_bbox = isinstance(geometry, Sequence) and not isinstance(geometry, shapely.Polygon)
+    if is_bbox:
         geom = shapely.box(*_check_bbox(geometry))
+    elif isinstance(geometry, shapely.Polygon):
+        geom = geometry
     else:
         raise TypeError(
             "`geometry` must be a shapely Polygon or an iterable of form (west, south, east, north)."
@@ -453,9 +459,185 @@ def tiffs_to_da(
     else:
         file = first.with_suffix(".vrt")
         build_vrt(file, tiff_files)
-    return (
-        rxr.open_rasterio(file)
+    da = (
+        cast(
+            "DataArray",
+            rxr.open_rasterio(file),
+        )
         .squeeze(drop=True)
         .rio.clip_box(*geom.bounds, crs=crs)
-        .rio.clip([geom], crs=crs)
     )
+    if not is_bbox:
+        da = da.rio.clip([geom], crs=crs)
+    return da
+
+
+def _transform_xy(
+    dataset: DatasetReader, xy: Iterable[tuple[float, float]]
+) -> Generator[tuple[int, int], None, None]:
+    """Transform x, y coordinates to row, col pixel indices."""
+    dt = dataset.transform
+    _xy = iter(xy)
+    while True:
+        buf = tuple(islice(_xy, 0, 256))
+        if not buf:
+            break
+        rows, cols = rowcol(dt, *zip(*buf, strict=False))
+        yield from zip(rows, cols, strict=False)
+
+
+def _sample_window(
+    dataset: DatasetReader,
+    xy: Iterable[tuple[float, float]],
+    window: int = 5,
+    indexes: int | list[int] | None = None,
+    masked: bool = False,
+    resampling: int = 1,
+) -> Generator[NDArray[np.floating], None, None]:
+    """Interpolate pixel values at given coordinates using windowed resampling.
+
+    Notes
+    -----
+    Adapted from ``rasterio.sample.sample_gen``. Reads a small window
+    around each point and uses rasterio's resampling to interpolate
+    to a single pixel value.
+
+    Parameters
+    ----------
+    dataset : rasterio.DatasetReader
+        Opened in ``"r"`` mode.
+    xy : iterable
+        Pairs of x, y coordinates in the dataset's reference system.
+    window : int, optional
+        Size of the window to read around each point, must be odd,
+        defaults to 5.
+    indexes : int or list of int, optional
+        Indexes of dataset bands to sample, defaults to all bands.
+    masked : bool, optional
+        Whether to mask samples that fall outside the extent of the
+        dataset, defaults to ``False``.
+    resampling : int, optional
+        Resampling method (see ``rasterio.enums.Resampling``),
+        defaults to 1 (bilinear).
+
+    Yields
+    ------
+    numpy.ndarray
+        Array of length equal to the number of specified indexes.
+    """
+    height = dataset.height
+    width = dataset.width
+
+    if indexes is None:
+        indexes = dataset.indexes
+    elif isinstance(indexes, int):
+        indexes = [indexes]
+    indexes = cast("list[int]", indexes)
+
+    nodata = np.full(len(indexes), (dataset.nodata or 0), dtype=dataset.dtypes[0])
+    if masked:
+        mask_flags = [set(dataset.mask_flag_enums[i - 1]) for i in indexes]
+        dataset_is_masked = any(
+            {MaskFlags.alpha, MaskFlags.per_dataset, MaskFlags.nodata} & enums
+            for enums in mask_flags
+        )
+        mask = [not (dataset_is_masked and enums == {MaskFlags.all_valid}) for enums in mask_flags]
+        nodata = np.ma.array(nodata, mask=mask)
+
+    half_window = window // 2
+    for row, col in _transform_xy(dataset, xy):
+        if 0 <= row < height and 0 <= col < width:
+            col_start = max(0, col - half_window)
+            row_start = max(0, row - half_window)
+            data = dataset.read(
+                indexes,
+                window=rasterio.windows.Window(
+                    col_start,  # ty: ignore[too-many-positional-arguments]
+                    row_start,
+                    window,
+                    window,
+                ),
+                out_shape=(len(indexes), 1, 1),
+                resampling=Resampling(resampling),
+                masked=masked,
+            )
+            yield data[:, 0, 0]
+        else:
+            yield nodata
+
+
+def elevation_bygrid(
+    longs: ArrayLike,
+    lats: ArrayLike,
+    window: int = 5,
+    resampling: int = 1,
+) -> NDArray[np.floating]:
+    """Sample elevation from 3DEP at a grid of lon/lat coordinates.
+
+    Notes
+    -----
+    Reads directly from the USGS 10 m seamless DEM VRT
+    (Cloud-Optimized GeoTIFFs, EPSG:4269). A small pixel window
+    around each query point is read and downsampled to a single
+    value using the chosen resampling kernel.
+
+    Parameters
+    ----------
+    longs : array-like
+        1D sequence of longitude values in decimal degrees.
+    lats : array-like
+        1D sequence of latitude values in decimal degrees.
+    window : int, optional
+        Size of the read window for interpolation, must be odd,
+        defaults to 5.
+    resampling : int, optional
+        Resampling method from ``rasterio.enums.Resampling``,
+        defaults to 1 (bilinear). Methods applicable to DEM
+        interpolation:
+
+        - 0: ``nearest`` — fastest, no interpolation
+        - 1: ``bilinear`` — good general-purpose default
+        - 2: ``cubic`` — sharper than bilinear
+        - 3: ``cubic_spline`` — smooth spline interpolation
+        - 4: ``lanczos`` — high-quality windowed sinc
+
+    Returns
+    -------
+    numpy.ndarray
+        2D array of shape ``(len(lats), len(longs))`` with elevation
+        values in meters.
+    """
+    if window % 2 == 0:
+        raise ValueError("`window` must be an odd integer.")
+
+    longs_arr = np.asarray(longs, dtype=np.float64)
+    lats_arr = np.asarray(lats, dtype=np.float64)
+
+    # Pad bbox so edge query points have enough surrounding pixels
+    vrt_info = VRTPool.get_vrt_info(10)
+    pad = abs(vrt_info.transform.a) * (window // 2 + 1)
+    _check_bounds(
+        (
+            float(longs_arr.min()) - pad,
+            float(lats_arr.min()) - pad,
+            float(longs_arr.max()) + pad,
+            float(lats_arr.max()) + pad,
+        ),
+        vrt_info.bounds,
+    )
+    nx, ny = len(longs_arr), len(lats_arr)
+
+    with rasterio.open(VRTLinks[10]) as src:
+        return np.fromiter(
+            (
+                v[0]
+                for v in _sample_window(
+                    src,
+                    ((lon, lat) for lat, lon in product(lats_arr, longs_arr)),
+                    window=window,
+                    resampling=resampling,
+                )
+            ),
+            dtype=src.dtypes[0],
+            count=nx * ny,
+        ).reshape(ny, nx)
