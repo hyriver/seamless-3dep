@@ -39,6 +39,9 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Add a GitHub Actions workflow (`docs.yml`) for automated documentation deployment.
     Pushes to `main` deploy the `dev` version, and tagged releases deploy a stable
     version via `mike`.
+- Add a GitHub Actions workflow (`docs.yml`) for automated documentation
+    deployment. Pushes to `main` deploy the `dev` version, and tagged releases
+    deploy a stable version via `mike`.
 
 ## [0.3.1] - 2025-02-12
 
