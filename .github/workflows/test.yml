@@ -17,22 +17,41 @@ concurrency:
 
 jobs:
   test:
-    name: python ${{ matrix.environment }}, ${{ matrix.os }}
+    name: unit - ${{ matrix.environment }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        environment: [test39, test313]
+        environment: [test310, test314]
 
     steps:
-    - uses: actions/checkout@v4
-    - uses: prefix-dev/setup-pixi@v0.8.14
+    - uses: actions/checkout@v6
+    - uses: prefix-dev/setup-pixi@v0.9.4
       with:
-        pixi-version: v0.45.0
+        pixi-version: v0.65.0
         environments: ${{ matrix.environment }}
         activate-environment: ${{ matrix.environment }}
-    - name: Run pixi
+    - name: Run unit tests
       run: pixi r test
+
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v5
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        slug: ${{ github.event.repository.owner.login }}/${{ github.event.repository.name }}
+
+  test-network:
+    name: network - test314, ubuntu-latest
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6
+    - uses: prefix-dev/setup-pixi@v0.9.4
+      with:
+        pixi-version: v0.65.0
+        environments: test314
+        activate-environment: test314
+    - name: Run network tests
+      run: pixi r test-network
 
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v5

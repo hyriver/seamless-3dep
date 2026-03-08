@@ -62,7 +62,6 @@ ds = xr.Dataset(
     },
     coords={"lon": longs, "lat": lats},
 )
-print(ds)
 
 # %% [markdown]
 # ## Retrieve elevation at grid points
@@ -84,7 +83,6 @@ ds["elevation"] = xr.DataArray(
     dims=["lat", "lon"],
     attrs={"units": "m", "long_name": "Elevation"},
 )
-print(ds)
 
 # %% [markdown]
 # ## Visualise the results

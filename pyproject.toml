@@ -1,6 +1,5 @@
 [build-system]
 build-backend = "hatchling.build"
-
 requires = [
   "hatch-vcs",
   "hatchling",
@@ -8,13 +7,10 @@ requires = [
 
 [project]
 name = "seamless-3dep"
-description = "Easy retrieval of smealess DEM from 3DEP across US."
+description = "Easy retrieval of seamless DEM from 3DEP across US."
 readme = "README.md"
 license = { text = "MIT" }
-authors = [
-  { name = "Taher Chegini", email = "cheginit@gmail.com" },
-]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 classifiers = [
   "Development Status :: 4 - Beta",
   "Intended Audience :: Science/Research",
@@ -22,11 +18,11 @@ classifiers = [
   "Operating System :: OS Independent",
   "Programming Language :: Python",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Topic :: Scientific/Engineering",
   "Topic :: Scientific/Engineering :: GIS",
   "Typing :: Typed",
@@ -35,59 +31,71 @@ dynamic = [
   "version",
 ]
 dependencies = [
+  "numpy",
   "rasterio",
   "tiny-retriever>=0.1.1",
 ]
-optional-dependencies.dev = [
+[[project.authors]]
+name = "Taher Chegini"
+email = "cheginit@gmail.com"
+[project.optional-dependencies]
+dev = [
   "geopandas>=1",
   "ipykernel",
   "ipywidgets",
+  "jupytext",
   "matplotlib",
   "pytest",
   "pywbt>=0.2.8",
   "rioxarray",
 ]
-optional-dependencies.docs = [
-  "black",
-  "mkdocs",
+docs = [
+  "jupytext",
+  "mike>=2",
+  "mkdocs>=1.6",
   "mkdocs-jupyter",
-  "mkdocs-material",
-  "mkdocstrings-python",
+  "mkdocs-materialx",
+  "mkdocstrings[python]>=0.27",
+  "ruff",
 ]
-optional-dependencies.lint = [
+lint = [
   "codespell",
   "pre-commit",
 ]
-optional-dependencies.test = [
+test = [
   "coverage[toml]",
   "pytest-cov",
   "pytest-sugar",
   "rioxarray",
   "shapely",
 ]
-optional-dependencies.typecheck = [
-  "pyright",
+typecheck = [
+  "pyproj",
+  "rioxarray",
+  "shapely",
+  "ty",
+  "xarray",
 ]
-urls.Changelog = "https://seamless-3dep.readthedocs.io/en/latest/CHANGELOG"
-urls.CI = "https://github.com/hyriver/seamless-3dep/actions"
-urls.Homepage = "https://seamless-3dep.readthedocs.io"
-urls.Issues = "https://github.com/hyriver/seamless-3dep/issues"
-
-[tool.hatch.version]
-source = "vcs"
+[project.urls]
+Changelog = "https://hyriver.github.io/seamless-3dep/latest/CHANGELOG/"
+CI = "https://github.com/hyriver/seamless-3dep/actions"
+Documentation = "https://hyriver.github.io/seamless-3dep"
+Homepage = "https://hyriver.github.io/seamless-3dep"
+Issues = "https://github.com/hyriver/seamless-3dep/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = [
   "src/seamless_3dep",
 ]
+[tool.hatch.version]
+source = "vcs"
 
 [tool.ruff]
-target-version = "py39"
+target-version = "py310"
 line-length = 100
-
 exclude = [ ".pixi", "__pycache__" ]
-
-lint.select = [
+[tool.ruff.lint]
+select = [
   # flake8-bugbear
   "B",
   # flake8-comprehensions
@@ -150,8 +158,7 @@ lint.select = [
   # flake8-2020
   "YTT",
 ]
-
-lint.ignore = [
+ignore = [
   "D103",
   "D105",
   "E501",
@@ -168,12 +175,11 @@ lint.ignore = [
   # custom exception
   "TRY003",
 ]
-
-lint.per-file-ignores."seamless_3dep/seamless_3dep.py" = [
+per-file-ignores."seamless_3dep/seamless_3dep.py" = [
   # specific type error ignored
   "PGH003",
 ]
-lint.per-file-ignores."tests/*.py" = [
+per-file-ignores."tests/*.py" = [
   "D100",
   "D101",
   "D102",
@@ -187,7 +193,7 @@ lint.per-file-ignores."tests/*.py" = [
   # use of "assert"
   "S101",
 ]
-lint.extend-safe-fixes = [
+extend-safe-fixes = [
   # module level imports
   "E402",
   # break down assert
@@ -197,14 +203,16 @@ lint.extend-safe-fixes = [
   # absolute imports
   "TID252",
 ]
-lint.isort.known-first-party = [ "seamless_3dep" ]
-lint.isort.required-imports = [ "from __future__ import annotations" ]
-
-lint.pydocstyle.convention = "numpy"
+isort.known-first-party = [ "seamless_3dep" ]
+isort.required-imports = [ "from __future__ import annotations" ]
+pydocstyle.convention = "numpy"
 
 [tool.codespell]
 skip = "__pycache__,_build,.mypy_cache,.git,./htmlcov,.pixi,pixi.lock,**.ipynb"
 ignore-words-list = "gage,gages"
+
+[tool.pyproject-fmt]
+table_format = "long"
 
 [tool.pytest.ini_options]
 addopts = [
@@ -216,12 +224,18 @@ addopts = [
   "--cov-report=xml",
   "--junitxml=junit.xml",
   "--durations=5",
+  "--basetemp=.pytest_tmp",
 ]
-doctest_optionflags = 'NORMALIZE_WHITESPACE IGNORE_EXCEPTION_DETAIL NUMBER'
+doctest_optionflags = "NORMALIZE_WHITESPACE IGNORE_EXCEPTION_DETAIL NUMBER"
+markers = [
+  "network: tests that make requests to external services",
+]
 testpaths = [
   "tests",
 ]
 
+[tool.coverage.paths]
+source = [ "src", "*/site-packages" ]
 [tool.coverage.report]
 exclude_lines = [
   "if TYPE_CHECKING:",
@@ -231,10 +245,6 @@ ignore_errors = true
 omit = [
   "**/__init__.py",
 ]
-
-[tool.coverage.paths]
-source = [ "src", "*/site-packages" ]
-
 [tool.coverage.run]
 branch = true
 parallel = true
@@ -242,66 +252,52 @@ source_pkgs = [
   "seamless_3dep",
 ]
 
-[tool.pyright]
+[tool.ty.environment]
+python-version = "3.10"
+[tool.ty.rules]
+all = "error"
+[tool.ty.src]
+include = [ "src/seamless_3dep" ]
 exclude = [
   "**/__pycache__",
   "**/__init__.py",
 ]
-include = [
-  "src/seamless_3dep",
-]
-reportMissingTypeStubs = false
-reportUnknownArgumentType = false
-reportUnknownLambdaType = false
-reportUnknownMemberType = false
-reportUnknownParameterType = false
-reportUnknownVariableType = false
-reportUnnecessaryIsInstance = false
-reportUntypedFunctionDecorator = false
-reportAttributeAccessIssue = false
-reportInvalidTypeForm = false
-typeCheckingMode = "strict"
-
-[tool.pixi.feature.docs.tasks]
-build-docs = "mkdocs build --strict"
-docs = "mkdocs serve"
-
-[tool.pixi.project]
-channels = [ "conda-forge" ]
-platforms = [ "linux-64", "osx-64", "osx-arm64", "win-64" ]
-
-[tool.pixi.pypi-dependencies]
-seamless_3dep = { path = ".", editable = true }
-
-[tool.pixi.feature.dev.dependencies]
-libgdal-core = "*"
-
-[tool.pixi.feature.test.dependencies]
-libgdal-core = "*"
-
-[tool.pixi.feature.py39.dependencies]
-python = "~=3.9.0"
-
-[tool.pixi.feature.py313.dependencies]
-python = "~=3.13.0"
 
 [tool.pixi.environments]
-dev = { features = [ "dev", "py313" ] }
-test39 = { features = [ "test", "py39" ] }
-test313 = { features = [ "test", "py313" ] }
-typecheck = { features = [ "typecheck", "py313" ] }
-lint = { features = [ "lint", "py313" ], no-default-feature = true }
-docs = { features = [ "docs", "dev", "py313" ] }
-
-[tool.pixi.feature.test.tasks]
-test = "pytest"
-report = { cmd = [ "coverage", "report" ], depends-on = [ "test" ] }
-html = { cmd = [ "coverage", "html" ], depends-on = [ "report" ] }
-
+dev = { features = [ "dev", "py314" ] }
+test310 = { features = [ "test", "py310" ] }
+test314 = { features = [ "test", "py314" ] }
+typecheck = { features = [ "typecheck", "py314" ] }
+lint = { features = [ "lint", "py314" ], no-default-feature = true }
+docs = { features = [ "docs", "dev", "py314" ] }
+[tool.pixi.feature.dev.dependencies]
+libgdal-core = "*"
+nbconvert = ">=7.17.0,<8"
+[tool.pixi.feature.docs.tasks]
+docs-build = "mkdocs build --strict"
+docs-serve = { cmd = "mkdocs serve", depends-on = [ "docs-build" ] }
+docs-deploy = "mike deploy --push --update-aliases dev latest"
+docs-release = "mike deploy --push --update-aliases $(git describe --tags --abbrev=0) stable"
 [tool.pixi.feature.lint.tasks]
 lint = "pre-commit run --all-files"
 pcupdate = "pre-commit autoupdate"
 spell = "codespell -w"
-
+[tool.pixi.feature.py310.dependencies]
+python = "~=3.10.0"
+[tool.pixi.feature.py314.dependencies]
+python = "~=3.14.0"
+[tool.pixi.feature.test.dependencies]
+libgdal-core = "*"
+[tool.pixi.feature.test.tasks]
+test = "pytest -m 'not network'"
+test-network = "pytest -m network"
+test-all = "pytest"
+report = { cmd = [ "coverage", "report" ], depends-on = [ "test-all" ] }
+html = { cmd = [ "coverage", "html" ], depends-on = [ "report" ] }
 [tool.pixi.feature.typecheck.tasks]
-typecheck = "pyright"
+typecheck = "ty check"
+[tool.pixi.pypi-dependencies]
+seamless_3dep = { path = ".", editable = true }
+[tool.pixi.workspace]
+channels = [ "conda-forge" ]
+platforms = [ "linux-64", "osx-64", "osx-arm64", "win-64" ]

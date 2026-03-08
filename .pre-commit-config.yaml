@@ -1,13 +1,15 @@
 repos:
 - repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v5.0.0
+  rev: v6.0.0
   hooks:
   - id: check-added-large-files
     args: [--maxkb=50000]
   - id: mixed-line-ending
     args: [--fix=lf]
   - id: check-ast
+    exclude: ^docs/examples/notebooks/.*\.py$
   - id: check-builtin-literals
+    exclude: ^docs/examples/notebooks/.*\.py$
   - id: check-case-conflict
   - id: check-docstring-first
   - id: check-shebang-scripts-are-executable
@@ -16,7 +18,9 @@ repos:
   - id: check-toml
   - id: check-xml
   - id: check-yaml
+    exclude: mkdocs.yml
   - id: debug-statements
+    exclude: ^docs/examples/notebooks/.*\.py$
   - id: destroyed-symlinks
   - id: detect-private-key
   - id: end-of-file-fixer
@@ -28,31 +32,32 @@ repos:
     exclude: \.(html|svg)$
 
 - repo: https://github.com/bwhmather/ssort
-  rev: 0.14.0
+  rev: 0.16.0
   hooks:
   - id: ssort
     name: Sort top level statements with ssort
+    exclude: ^docs/examples/notebooks/.*\.py$
 
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.11.6
+  rev: v0.15.5
   hooks:
   - id: ruff
     name: Linting with Ruff
     types_or: [python, jupyter]
-    args: [--fix]
+    args: [--fix, --unsafe-fixes]
   - id: ruff-format
     name: Formatting with Ruff
     types_or: [python, jupyter]
 
 - repo: https://github.com/PyCQA/doc8
-  rev: v1.1.2
+  rev: v2.0.0
   hooks:
   - id: doc8
     name: Check documentation formats with doc8
     args: [--max-line-length, '100']
 
 - repo: https://github.com/codespell-project/codespell
-  rev: v2.4.1
+  rev: v2.4.2
   hooks:
   - id: codespell
     name: Check common misspellings in text files with codespell.
@@ -60,29 +65,34 @@ repos:
     - tomli
 
 - repo: https://github.com/tox-dev/pyproject-fmt
-  rev: v2.5.1
+  rev: v2.16.2
   hooks:
   - id: pyproject-fmt
     name: Apply a consistent format to pyproject.toml
 
 - repo: https://github.com/macisamuele/language-formatters-pre-commit-hooks
-  rev: v2.14.0
+  rev: v2.16.0
   hooks:
   - id: pretty-format-yaml
     args: [--autofix, --indent, '2']
 
 - repo: https://github.com/rhysd/actionlint
-  rev: v1.7.7
+  rev: v1.7.11
   hooks:
   - id: actionlint
     files: .github/workflows/
     args: [-ignore, SC1090, -ignore, SC2046, -ignore, SC2086, -ignore, SC2129, -ignore, SC2155, -ignore, property "date"]
 
 - repo: https://github.com/executablebooks/mdformat
-  rev: 0.7.22
+  rev: 1.0.0
   hooks:
   - id: mdformat
     additional_dependencies:
-    - mdformat-mkdocs[recommended]
+    - mdformat-mkdocs
+    - mdformat-ruff
+    - ruff
+    - mdformat-config
     - mdformat-toc
+    # - mdformat-admon
     args: [--wrap, '88']
+    exclude: ^docs/reference/

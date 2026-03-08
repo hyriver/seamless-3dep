@@ -119,6 +119,7 @@ def test_decompose_bbox_coverage():
     assert orig_points.issubset(points_covered)
 
 
+@pytest.mark.network
 def test_dem_and_vrt(tmp_path):
     bbox = (-121.1, 37.9, -121.0, 38.0)
     dem_dir = tmp_path / "dem_data"
@@ -140,6 +141,7 @@ def test_dem_and_vrt(tmp_path):
     assert dem.shape == (359, 359)
 
 
+@pytest.mark.network
 def test_3dep(tmp_path):
     bbox = (-121.1, 37.9, -121.0, 38.0)
     slope_dir = tmp_path / "slope_data"
