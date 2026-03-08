@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+         <loc>https://docs.hyriver.io/seamless-3dep/v0.4.0/reference/</loc>
+         <lastmod>2026-03-08</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.hyriver.io/seamless-3dep/v0.4.0/examples/</loc>
+         <lastmod>2026-03-08</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.hyriver.io/seamless-3dep/v0.4.0/examples/dem/</loc>
+         <lastmod>2026-03-08</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.hyriver.io/seamless-3dep/v0.4.0/examples/elevation/</loc>
+         <lastmod>2026-03-08</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.hyriver.io/seamless-3dep/v0.4.0/CHANGELOG/</loc>
+         <lastmod>2026-03-08</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.hyriver.io/seamless-3dep/v0.4.0/CONTRIBUTING/</loc>
+         <lastmod>2026-03-08</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.hyriver.io/seamless-3dep/v0.4.0/</loc>
+         <lastmod>2026-03-08</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.hyriver.io/seamless-3dep/v0.4.0/LICENSE/</loc>
+         <lastmod>2026-03-08</lastmod>
+    </url>
+</urlset>
