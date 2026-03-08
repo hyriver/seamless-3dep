@@ -4,7 +4,7 @@ The example notebooks have several dependencies. You can install all the depende
 using `micromamba` (or `conda` or `mamba`):
 
 ```bash
-micormamba create -n 3dep seamless-3dep pywbt geopandas ipykernel ipywidgets
+micromamba create -n 3dep seamless-3dep pywbt geopandas ipykernel ipywidgets
 ```
 
 This will create a new environment called `3dep` with all the required packages.
@@ -13,5 +13,8 @@ This will create a new environment called `3dep` with all the required packages.
 
 - [![DEM Processing](images/dem.png){ loading=lazy }](dem.ipynb "DEM Processing") **DEM
     Processing**
+
+- [![Elevation Grid](images/elevation_grid.png){ loading=lazy }](elevation.ipynb "Elevation Grid")
+    **Elevation Grid**
 
 </div>

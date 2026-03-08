@@ -22,7 +22,7 @@ calls and minimize redundant connections. This reduces both the service load and
 time required to retrieve data, making it an ideal tool for handling large-scale
 topographic data requests.
 
-📚 Full documentation is available [here](https://seamless-3dep.readthedocs.io).
+📚 Full documentation is available [here](https://hyriver.github.io/seamless-3dep).
 
 ## Available Products
 
@@ -50,7 +50,7 @@ topographic data requests.
 
 ## Core Functions
 
-Seamless3DEP offers four main functions designed for efficient data retrieval and
+Seamless3DEP offers six main functions designed for efficient data retrieval and
 processing:
 
 - `get_dem`: Retrieves static DEMs within a specified bounding box. The function
@@ -60,6 +60,10 @@ processing:
     Works with all available product types, allows custom resolution settings, and
     downloads in EPSG:3857. Due to service limitations, the output projection is not
     configurable.
+- `elevation_bygrid`: Samples elevation values from the 10 m seamless DEM at a grid of
+    longitude/latitude coordinates. Reads directly from the USGS Cloud-Optimized
+    GeoTIFFs (EPSG:4269) and supports configurable resampling methods including nearest,
+    bilinear, cubic, cubic spline, and Lanczos.
 - `decompose_bbox`: Handles large area requests by breaking down extensive bounding
     boxes into optimal sizes based on resolution and maximum pixel count, ensuring
     efficient data retrieval.
@@ -135,5 +139,5 @@ dem = s3dep.tiffs_to_da(slope_files, bbox)
 ## Contributing
 
 We welcome contributions! Please see the
-[contributing](https://seamless-3dep.readthedocs.io/en/latest/CONTRIBUTING/) section for
+[contributing](https://hyriver.github.io/seamless-3dep/latest/CONTRIBUTING/) section for
 guidelines and instructions.

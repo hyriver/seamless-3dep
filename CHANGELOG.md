@@ -5,11 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.0] - 2026-03-08
 
 ### Added
 
+- Add a new function called `elevation_bygrid` that samples elevation values from the
+    USGS 10 m seamless DEM VRT at a grid of longitude/latitude coordinates. It reads
+    directly from Cloud-Optimized GeoTIFFs (EPSG:4269) and supports configurable
+    resampling methods (nearest, bilinear, cubic, cubic spline, and Lanczos) via a
+    windowed read approach. This is useful for obtaining elevation values at arbitrary
+    point locations without downloading full tiles.
+- Add `numpy` as an explicit dependency (previously only a transitive dependency via
+    `rasterio`).
+
 ### Changed
+
+- Improve thread safety in `get_dem` by opening a fresh `DatasetReader` per tile instead
+    of sharing a single instance across threads. The `VRTPool` is now used only for
+    metadata (bounds, transform, nodata), not for concurrent reads.
+- Add early-return optimization in `get_map`: skip downloading when all requested tiles
+    already exist on disk (consistent with `get_dem` behavior).
+- Move the `valid_types` tuple in `get_map` to a module-level constant
+    (`VALID_MAP_TYPES`).
+- Simplify `tiffs_to_da` by skipping the `.rio.clip()` step when the geometry is a
+    bounding box, since `.rio.clip_box()` already handles that case.
+- Migrate documentation from ReadTheDocs to GitHub Pages with `mike` versioning.
 
 ## [0.3.1] - 2025-02-12
 
