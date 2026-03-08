@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+### Changed
+
 ## [0.4.0] - 2026-03-08
 
 ### Added
@@ -30,6 +36,9 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Simplify `tiffs_to_da` by skipping the `.rio.clip()` step when the geometry is a
     bounding box, since `.rio.clip_box()` already handles that case.
 - Migrate documentation from ReadTheDocs to GitHub Pages with `mike` versioning.
+- Add a GitHub Actions workflow (`docs.yml`) for automated documentation
+    deployment. Pushes to `main` deploy the `dev` version, and tagged releases
+    deploy a stable version via `mike`.
 
 ## [0.3.1] - 2025-02-12
 
