@@ -1,0 +1,49 @@
+<VRTDataset rasterXSize="7856" rasterYSize="5780">
+  <SRS dataAxisToSRSAxisMapping="1,2">PROJCS["WGS 84 / Pseudo-Mercator",GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4326"]],PROJECTION["Mercator_1SP"],PARAMETER["central_meridian",0],PARAMETER["scale_factor",1],PARAMETER["false_easting",0],PARAMETER["false_northing",0],UNIT["metre",1,AUTHORITY["EPSG","9001"]],AXIS["Easting",EAST],AXIS["Northing",NORTH],EXTENSION["PROJ4","+proj=merc +a=6378137 +b=6378137 +lat_ts=0 +lon_0=0 +x_0=0 +y_0=0 +k=1 +units=m +nadgrids=@null +wktext +no_defs"],AUTHORITY["EPSG","3857"]]</SRS>
+  <GeoTransform> -1.1771639483227819e+07,  1.3081205298096259e+01,  0.0000000000000000e+00,  4.9143842664640024e+06,  0.0000000000000000e+00, -1.3081205298096123e+01</GeoTransform>
+  <VRTRasterBand dataType="Byte" band="1">
+    <ColorInterp>Gray</ColorInterp>
+    <SimpleSource resampling="nearest">
+      <SourceFilename relativeToVRT="1">slope_degrees_e6e7db8c5a0b94c76cddf41fd5c74c9243a27204091feb4b7632e646fd8a5234.tiff</SourceFilename>
+      <SourceBand>1</SourceBand>
+      <SourceProperties RasterXSize="2624" RasterYSize="2890" DataType="Byte" BlockXSize="128" BlockYSize="128" />
+      <SrcRect xOff="0" yOff="0" xSize="2624" ySize="2890" />
+      <DstRect xOff="5.0112503528877" yOff="2895.51925057926" xSize="2618.98874964711" ySize="2884.48074942074" />
+    </SimpleSource>
+    <SimpleSource resampling="nearest">
+      <SourceFilename relativeToVRT="1">slope_degrees_6177a7fdb64c406f729f6d198d0beb5c877f0f8cc77861d4f0252f40648d899d.tiff</SourceFilename>
+      <SourceBand>1</SourceBand>
+      <SourceProperties RasterXSize="2624" RasterYSize="2890" DataType="Byte" BlockXSize="128" BlockYSize="128" />
+      <SrcRect xOff="0" yOff="0" xSize="2624" ySize="2890" />
+      <DstRect xOff="0" yOff="0" xSize="2629.01125035289" ySize="2895.51925057919" />
+    </SimpleSource>
+    <SimpleSource resampling="nearest">
+      <SourceFilename relativeToVRT="1">slope_degrees_473db17032e38674c238e58d8df4d623b39946f1c1cc35b85d6e14209965ac9b.tiff</SourceFilename>
+      <SourceBand>1</SourceBand>
+      <SourceProperties RasterXSize="2624" RasterYSize="2890" DataType="Byte" BlockXSize="128" BlockYSize="128" />
+      <SrcRect xOff="0" yOff="0" xSize="2624" ySize="2890" />
+      <DstRect xOff="2618.65928566103" yOff="2895.51925057926" xSize="2618.98874964711" ySize="2884.48074942074" />
+    </SimpleSource>
+    <SimpleSource resampling="nearest">
+      <SourceFilename relativeToVRT="1">slope_degrees_72ae3dffb7e48f2ae7141df1ec72d4d214032a920ec39a9bcdb3bc46b03bd7a4.tiff</SourceFilename>
+      <SourceBand>1</SourceBand>
+      <SourceProperties RasterXSize="2624" RasterYSize="2890" DataType="Byte" BlockXSize="128" BlockYSize="128" />
+      <SrcRect xOff="0" yOff="0" xSize="2624" ySize="2890" />
+      <DstRect xOff="2613.64803530814" yOff="0" xSize="2629.01125035289" ySize="2895.51925057919" />
+    </SimpleSource>
+    <SimpleSource resampling="nearest">
+      <SourceFilename relativeToVRT="1">slope_degrees_4ac1f1bcaffc0c10020267239112a6faff827134b68f30064481d082bcbb9d06.tiff</SourceFilename>
+      <SourceBand>1</SourceBand>
+      <SourceProperties RasterXSize="2624" RasterYSize="2890" DataType="Byte" BlockXSize="128" BlockYSize="128" />
+      <SrcRect xOff="0" yOff="0" xSize="2624" ySize="2890" />
+      <DstRect xOff="5232.30732096888" yOff="2895.51925057926" xSize="2618.98874964711" ySize="2884.48074942074" />
+    </SimpleSource>
+    <SimpleSource resampling="nearest">
+      <SourceFilename relativeToVRT="1">slope_degrees_786e293e7a1dba4bbeca47d7eadaf9ba534c208305d0c89d831cbd71f3e70fd0.tiff</SourceFilename>
+      <SourceBand>1</SourceBand>
+      <SourceProperties RasterXSize="2624" RasterYSize="2890" DataType="Byte" BlockXSize="128" BlockYSize="128" />
+      <SrcRect xOff="0" yOff="0" xSize="2623.69326482638" ySize="2890" />
+      <DstRect xOff="5227.29607061599" yOff="0" xSize="2628.70392938401" ySize="2895.51925057919" />
+    </SimpleSource>
+  </VRTRasterBand>
+</VRTDataset>

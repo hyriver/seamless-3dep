@@ -1,0 +1,43 @@
+{
+    "tool_name": "CorrectStreamVectorDirection",
+    "exe": "correct_stream_vector_direction",
+    "short_description": "This tool resolves directional errors in digitized vector streams.",
+    "help": "This tool resolves directional errors in digitized vector streams.",
+    "toolbox": "Stream Network Analysis",
+    "license": "MIT",
+    "example": ">> .*EXE_NAME -r=CorrectStreamVectorDirection --input=streams.shp --outlet=outlet.shp --output=streams_fixed.shp --snap=2.0",
+    "parameters": [
+        {
+            "name": "Input Vector Lines",
+            "flags": ["-i", "--input"],
+            "description": "Name of the input lines vector file.",
+            "parameter_type": {"ExistingFile":{"Vector":"Line"}},
+            "default_value": null,
+            "optional": false
+        },
+        {
+            "name": "Outlet Vector Points",
+            "flags": ["--outlet"],
+            "description": "Name of the input outlet vector points file.",
+            "parameter_type": {"ExistingFile":{"Vector":"Point"}},
+            "default_value": null,
+            "optional": false
+        },
+        {
+            "name": "Output Lines",
+            "flags": ["-o", "--output"],
+            "description": "Name of the output lines vector file.",
+            "parameter_type": {"NewFile":{"Vector":"Line"}},
+            "default_value": null,
+            "optional": false
+        },
+        {
+            "name": "Snap Distance",
+            "flags": ["--snap", "--dist"],
+            "description": "Snap distance, in xy units (metres).",
+            "parameter_type": "Float",
+            "default_value": "",
+            "optional": false
+        }
+    ]
+}
