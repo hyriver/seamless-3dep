@@ -15,12 +15,12 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
-- Fix sub-pixel interpolation in `elevation_bygrid`. Previously, `_transform_xy`
-    called `rasterio.transform.rowcol()` with its default `op=numpy.floor`, which
-    snapped every query coordinate to the nearest integer pixel index. When the query
-    grid was finer than the ~10 m DEM pixels, multiple points mapped to the same pixel
-    and received identical values, producing systematic staircase/plateau artifacts.
-    Now fractional pixel coordinates are preserved and carried through to the
+- Fix sub-pixel interpolation in `elevation_bygrid`. Previously, `_transform_xy` called
+    `rasterio.transform.rowcol()` with its default `op=numpy.floor`, which snapped every
+    query coordinate to the nearest integer pixel index. When the query grid was finer
+    than the ~10 m DEM pixels, multiple points mapped to the same pixel and received
+    identical values, producing systematic staircase/plateau artifacts. Now fractional
+    pixel coordinates are preserved and carried through to the
     `rasterio.windows.Window`, so GDAL's resampling kernel interpolates at the true
     sub-pixel position.
 
