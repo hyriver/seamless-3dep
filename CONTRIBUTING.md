@@ -133,8 +133,8 @@ suggestion and find related suggestions.
 #### Before Submitting an Enhancement
 
 - Make sure that you are using the latest version.
-- Read the [documentation](https://docs.hyriver.io/seamless-3dep) carefully and find
-    out if the functionality is already covered, maybe by an individual configuration.
+- Read the [documentation](https://docs.hyriver.io/seamless-3dep) carefully and find out
+    if the functionality is already covered, maybe by an individual configuration.
 - Perform a [search](https://github.com/hyriver/seamless-3dep/issues) to see if the
     enhancement has already been suggested. If it has, add a comment to the existing
     issue instead of opening a new one.

@@ -179,6 +179,11 @@ per-file-ignores."seamless_3dep/seamless_3dep.py" = [
   # specific type error ignored
   "PGH003",
 ]
+per-file-ignores."docs/examples/*.py" = [
+  # notebook-generated files
+  "B018",
+  "D100",
+]
 per-file-ignores."tests/*.py" = [
   "D100",
   "D101",
