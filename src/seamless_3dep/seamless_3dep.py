@@ -474,15 +474,15 @@ def tiffs_to_da(
 
 def _transform_xy(
     dataset: DatasetReader, xy: Iterable[tuple[float, float]]
-) -> Generator[tuple[int, int], None, None]:
-    """Transform x, y coordinates to row, col pixel indices."""
+) -> Generator[tuple[float, float], None, None]:
+    """Transform x, y coordinates to fractional row, col pixel indices."""
     dt = dataset.transform
     _xy = iter(xy)
     while True:
         buf = tuple(islice(_xy, 0, 256))
         if not buf:
             break
-        rows, cols = rowcol(dt, *zip(*buf, strict=False))
+        rows, cols = rowcol(dt, *zip(*buf, strict=False), op=lambda x: x)
         yield from zip(rows, cols, strict=False)
 
 
@@ -547,8 +547,8 @@ def _sample_window(
     half_window = window // 2
     for row, col in _transform_xy(dataset, xy):
         if 0 <= row < height and 0 <= col < width:
-            col_start = max(0, col - half_window)
-            row_start = max(0, row - half_window)
+            col_start = max(0.0, col - half_window)
+            row_start = max(0.0, row - half_window)
             data = dataset.read(
                 indexes,
                 window=rasterio.windows.Window(

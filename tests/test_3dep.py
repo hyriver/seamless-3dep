@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+import numpy as np
 import pytest
 import rasterio
 import shapely
@@ -173,6 +174,27 @@ def test_build_vrt_failure():
             s3dep.build_vrt(vrt_path, [tiff1, tiff2, tiff3])
 
         assert "No valid files" in str(excinfo.value)
+
+
+@pytest.mark.network
+def test_subpixel_interpolation():
+    """Test that sub-pixel query points produce distinct interpolated values.
+
+    When query points are spaced finer than the ~10m DEM pixel size,
+    each point should get a unique interpolated value rather than being
+    snapped to the nearest pixel center (which would cause staircase artifacts).
+    """
+    # At ~40N latitude, 10m ≈ 0.0001 degrees
+    # Create a grid much finer than the DEM pixel size
+    longs = np.linspace(-105.5, -105.499, 10)  # ~11m span, 10 points
+    lats = np.linspace(40.0, 40.001, 10)  # ~111m span, 10 points
+
+    elev = s3dep.elevation_bygrid(longs, lats, window=5, resampling=1)
+    assert elev.shape == (10, 10)
+    n_unique = len(np.unique(elev))
+    # With proper sub-pixel interpolation, nearly all values should be unique
+    # Without it (pixel snapping), many points would share the same value
+    assert n_unique > elev.size * 0.8
 
 
 @pytest.fixture(scope="session", autouse=True)

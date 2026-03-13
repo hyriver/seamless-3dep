@@ -11,6 +11,19 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
+## [0.4.1] - 2026-03-13
+
+### Fixed
+
+- Fix sub-pixel interpolation in `elevation_bygrid`. Previously, `_transform_xy`
+    called `rasterio.transform.rowcol()` with its default `op=numpy.floor`, which
+    snapped every query coordinate to the nearest integer pixel index. When the query
+    grid was finer than the ~10 m DEM pixels, multiple points mapped to the same pixel
+    and received identical values, producing systematic staircase/plateau artifacts.
+    Now fractional pixel coordinates are preserved and carried through to the
+    `rasterio.windows.Window`, so GDAL's resampling kernel interpolates at the true
+    sub-pixel position.
+
 ## [0.4.0] - 2026-03-08
 
 ### Added
@@ -39,9 +52,9 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Add a GitHub Actions workflow (`docs.yml`) for automated documentation deployment.
     Pushes to `main` deploy the `dev` version, and tagged releases deploy a stable
     version via `mike`.
-- Add a GitHub Actions workflow (`docs.yml`) for automated documentation
-    deployment. Pushes to `main` deploy the `dev` version, and tagged releases
-    deploy a stable version via `mike`.
+- Add a GitHub Actions workflow (`docs.yml`) for automated documentation deployment.
+    Pushes to `main` deploy the `dev` version, and tagged releases deploy a stable
+    version via `mike`.
 
 ## [0.3.1] - 2025-02-12
 
