@@ -125,10 +125,47 @@ diff = elev_lanczos - elev_nearest
 
 fig, ax = plt.subplots(figsize=(6, 4))
 im = ax.pcolormesh(longs, lats, diff, cmap="RdBu_r", shading="auto")
-fig.colorbar(im, ax=ax, label="Lanczos − Nearest (m)")
+fig.colorbar(im, ax=ax, label="Lanczos - Nearest (m)")
 ax.set_xlabel("Longitude")
 ax.set_ylabel("Latitude")
 ax.set_title("Resampling Difference")
 fig.tight_layout()
 fig.savefig("images/resampling_diff.png")
+plt.show()
+
+# %% [markdown]
+# ## Sub-pixel interpolation
+#
+# When the query grid is finer than the DEM pixel size (~10 m),
+# `elevation_bygrid` interpolates at the exact fractional pixel
+# position. This avoids the staircase/plateau artifacts that would
+# appear if each query point were simply snapped to the nearest pixel
+# center.
+#
+# To demonstrate, we sample a small 200 m patch at 2 m spacing
+# (100 x 100 points) using bilinear and nearest-neighbour resampling.
+
+# %%
+# ~200 m patch at ~2 m spacing (much finer than the 10 m DEM)
+fine_longs = np.linspace(-105.5, -105.498, 100)
+fine_lats = np.linspace(40.0, 40.002, 100)
+
+elev_bilinear = s3dep.elevation_bygrid(fine_longs, fine_lats, resampling=1)
+elev_nearest = s3dep.elevation_bygrid(fine_longs, fine_lats, resampling=0)
+
+fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
+
+im0 = axes[0].pcolormesh(fine_longs, fine_lats, elev_nearest, shading="auto")
+fig.colorbar(im0, ax=axes[0], label="Elevation (m)")
+axes[0].set_title("Nearest (staircase artifacts)")
+axes[0].set_xlabel("Longitude")
+axes[0].set_ylabel("Latitude")
+
+im1 = axes[1].pcolormesh(fine_longs, fine_lats, elev_bilinear, shading="auto")
+fig.colorbar(im1, ax=axes[1], label="Elevation (m)")
+axes[1].set_title("Bilinear (smooth interpolation)")
+axes[1].set_xlabel("Longitude")
+
+fig.tight_layout()
+fig.savefig("images/subpixel_interpolation.png")
 plt.show()
