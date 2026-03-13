@@ -569,7 +569,7 @@ def _sample_window(
 def elevation_bygrid(
     longs: ArrayLike,
     lats: ArrayLike,
-    window: int = 5,
+    pad: int = 5,
     resampling: int = 1,
 ) -> NDArray[np.floating]:
     """Sample elevation from 3DEP at a grid of lon/lat coordinates.
@@ -577,9 +577,10 @@ def elevation_bygrid(
     Notes
     -----
     Reads directly from the USGS 10 m seamless DEM VRT
-    (Cloud-Optimized GeoTIFFs, EPSG:4269). A small pixel window
-    around each query point is read and downsampled to a single
-    value using the chosen resampling kernel.
+    (Cloud-Optimized GeoTIFFs, EPSG:4269). Reads a single window
+    covering the full query extent (plus padding) and resamples
+    to the requested output grid size in one pass, avoiding
+    per-point pixel snapping artifacts.
 
     Parameters
     ----------
@@ -587,9 +588,10 @@ def elevation_bygrid(
         1D sequence of longitude values in decimal degrees.
     lats : array-like
         1D sequence of latitude values in decimal degrees.
-    window : int, optional
-        Size of the read window for interpolation, must be odd,
-        defaults to 5.
+    pad : int, optional
+        Number of extra source pixels to read beyond the query
+        extent on each side, defaults to 5. More padding gives
+        resampling kernels fuller context at the edges.
     resampling : int, optional
         Resampling method from ``rasterio.enums.Resampling``,
         defaults to 1 (bilinear). Methods applicable to DEM
@@ -607,37 +609,42 @@ def elevation_bygrid(
         2D array of shape ``(len(lats), len(longs))`` with elevation
         values in meters.
     """
-    if window % 2 == 0:
-        raise ValueError("`window` must be an odd integer.")
-
     longs_arr = np.asarray(longs, dtype=np.float64)
     lats_arr = np.asarray(lats, dtype=np.float64)
 
-    # Pad bbox so edge query points have enough surrounding pixels
     vrt_info = VRTPool.get_vrt_info(10)
-    pad = abs(vrt_info.transform.a) * (window // 2 + 1)
+    bounds_pad = abs(vrt_info.transform.a) * (pad + 1)
     _check_bounds(
         (
-            float(longs_arr.min()) - pad,
-            float(lats_arr.min()) - pad,
-            float(longs_arr.max()) + pad,
-            float(lats_arr.max()) + pad,
+            float(longs_arr.min()) - bounds_pad,
+            float(lats_arr.min()) - bounds_pad,
+            float(longs_arr.max()) + bounds_pad,
+            float(lats_arr.max()) + bounds_pad,
         ),
         vrt_info.bounds,
     )
     nx, ny = len(longs_arr), len(lats_arr)
 
     with rasterio.open(VRTLinks[10]) as src:
-        return np.fromiter(
-            (
-                v[0]
-                for v in _sample_window(
-                    src,
-                    ((lon, lat) for lat, lon in product(lats_arr, longs_arr)),
-                    window=window,
-                    resampling=resampling,
-                )
-            ),
-            dtype=src.dtypes[0],
-            count=nx * ny,
-        ).reshape(ny, nx)
+        # Get the source window covering the query extent
+        src_window = rasterio.windows.from_bounds(
+            float(longs_arr.min()),
+            float(lats_arr.min()),
+            float(longs_arr.max()),
+            float(lats_arr.max()),
+            src.transform,
+        )
+        # Pad source window so edge pixels have context for resampling
+        src_window = rasterio.windows.Window(
+            src_window.col_off - pad,
+            src_window.row_off - pad,
+            src_window.width + 2 * pad,
+            src_window.height + 2 * pad,
+        )
+        data = src.read(
+            1,
+            window=src_window,
+            out_shape=(ny, nx),
+            resampling=Resampling(resampling),
+        )
+        return data.astype(src.dtypes[0])
