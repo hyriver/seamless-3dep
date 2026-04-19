@@ -21,9 +21,9 @@ jobs:
       with:
         fetch-depth: 0
 
-    - uses: prefix-dev/setup-pixi@v0.9.4
+    - uses: prefix-dev/setup-pixi@v0.9.5
       with:
-        pixi-version: v0.65.0
+        pixi-version: 0.67.0
         environments: docs
         activate-environment: docs
 

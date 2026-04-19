@@ -39,7 +39,7 @@ repos:
     exclude: ^docs/examples/notebooks/.*\.py$
 
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.15.5
+  rev: v0.15.11
   hooks:
   - id: ruff
     name: Linting with Ruff
@@ -65,7 +65,7 @@ repos:
     - tomli
 
 - repo: https://github.com/tox-dev/pyproject-fmt
-  rev: v2.16.2
+  rev: v2.21.1
   hooks:
   - id: pyproject-fmt
     name: Apply a consistent format to pyproject.toml
@@ -77,7 +77,7 @@ repos:
     args: [--autofix, --indent, '2']
 
 - repo: https://github.com/rhysd/actionlint
-  rev: v1.7.11
+  rev: v1.7.12
   hooks:
   - id: actionlint
     files: .github/workflows/

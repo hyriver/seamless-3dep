@@ -1,11 +1,14 @@
 # ---
 # jupyter:
 #   jupytext:
+#     cell_metadata_filter: -all
+#     formats: ipynb,py:percent
+#     notebook_metadata_filter: kernelspec,jupytext
 #     text_representation:
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: '1.16.0'
+#       jupytext_version: 1.19.1
 #   kernelspec:
 #     display_name: dev
 #     language: python

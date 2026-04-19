@@ -10,6 +10,7 @@ name = "seamless-3dep"
 description = "Easy retrieval of seamless DEM from 3DEP across US."
 readme = "README.md"
 license = { text = "MIT" }
+authors = [ { name = "Taher Chegini", email = "cheginit@gmail.com" } ]
 requires-python = ">=3.10"
 classifiers = [
   "Development Status :: 4 - Beta",
@@ -35,21 +36,18 @@ dependencies = [
   "rasterio",
   "tiny-retriever>=0.1.1",
 ]
-[[project.authors]]
-name = "Taher Chegini"
-email = "cheginit@gmail.com"
-[project.optional-dependencies]
-dev = [
+optional-dependencies.dev = [
   "geopandas>=1",
   "ipykernel",
   "ipywidgets",
   "jupytext",
   "matplotlib",
+  "nbconvert",
   "pytest",
   "pywbt>=0.2.8",
   "rioxarray",
 ]
-docs = [
+optional-dependencies.docs = [
   "jupytext",
   "mike>=2",
   "mkdocs>=1.6",
@@ -58,169 +56,192 @@ docs = [
   "mkdocstrings[python]>=0.27",
   "ruff",
 ]
-lint = [
+optional-dependencies.lint = [
   "codespell",
   "pre-commit",
 ]
-test = [
+optional-dependencies.test = [
   "coverage[toml]",
   "pytest-cov",
   "pytest-sugar",
   "rioxarray",
   "shapely",
 ]
-typecheck = [
+optional-dependencies.typecheck = [
+  "pandas-stubs",
   "pyproj",
+  "pyright",
   "rioxarray",
+  "scipy-stubs",
   "shapely",
-  "ty",
+  "types-geopandas",
+  "types-pyyaml",
+  "types-shapely",
   "xarray",
 ]
-[project.urls]
-Changelog = "https://docs.hyriver.io/seamless-3dep/latest/CHANGELOG/"
-CI = "https://github.com/hyriver/seamless-3dep/actions"
-Documentation = "https://docs.hyriver.io/seamless-3dep"
-Homepage = "https://docs.hyriver.io/seamless-3dep"
-Issues = "https://github.com/hyriver/seamless-3dep/issues"
+urls.Changelog = "https://docs.hyriver.io/seamless-3dep/latest/CHANGELOG/"
+urls.CI = "https://github.com/hyriver/seamless-3dep/actions"
+urls.Documentation = "https://docs.hyriver.io/seamless-3dep"
+urls.Homepage = "https://docs.hyriver.io/seamless-3dep"
+urls.Issues = "https://github.com/hyriver/seamless-3dep/issues"
 
-[tool.hatch.build.targets.wheel]
-packages = [
+[tool.hatch]
+build.targets.wheel.packages = [
   "src/seamless_3dep",
 ]
-[tool.hatch.version]
-source = "vcs"
+version.source = "vcs"
+
+[tool.pixi.environments]
+dev = { features = [ "dev", "py314" ] }
+test310 = { features = [ "test", "py310" ] }
+test314 = { features = [ "test", "py314" ] }
+typecheck = { features = [ "typecheck", "py314" ] }
+lint = { features = [ "lint", "py314" ], no-default-feature = true }
+docs = { features = [ "docs", "py314" ] }
+
+[tool.pixi.feature.dev.dependencies]
+libgdal-core = "*"
+
+[tool.pixi.feature.dev.tasks]
+# Sync all percent-format .py scripts → paired .ipynb files
+nb-sync = "jupytext --sync docs/examples/*.py"
+# Execute all notebooks in-place (requires .ipynb to exist; run nb-sync first)
+nb-execute = "jupyter nbconvert --to notebook --execute --inplace docs/examples/*.ipynb"
+# Full workflow: sync .py → .ipynb, then execute - use before building docs or committing
+nb-run = { depends-on = [ "nb-sync", "nb-execute" ] }
+# Pair an existing .ipynb with a .py counterpart (one-time setup for imported notebooks)
+nb-pair = "jupytext --set-formats 'ipynb,py:percent' docs/examples/*.ipynb"
+# Strip all cell outputs from .ipynb files (keeps repo diff clean)
+nb-clear = "jupyter nbconvert --ClearOutputPreprocessor.enabled=True --to notebook --inplace docs/examples/*.ipynb"
+
+[tool.pixi.feature.docs.tasks]
+docs-build = "mkdocs build --strict"
+docs-serve = { cmd = "mkdocs serve", depends-on = [ "docs-build" ] }
+docs-deploy = "mike deploy --push latest"
+docs-release = "mike deploy --push --update-aliases $(git describe --tags --abbrev=0) stable"
+
+[tool.pixi.feature.lint.tasks]
+lint = "pre-commit run --all-files"
+pcupdate = "pre-commit autoupdate"
+spell = "codespell -w"
+
+[tool.pixi.feature.py310.dependencies]
+python = "~=3.10.0"
+
+[tool.pixi.feature.py314.dependencies]
+python = "~=3.14.0"
+
+[tool.pixi.feature.test.dependencies]
+libgdal-core = "*"
+
+[tool.pixi.feature.test.tasks]
+test = "pytest -m 'not network'"
+test-network = "pytest -m network"
+test-all = "pytest"
+report = { cmd = [ "coverage", "report" ], depends-on = [ "test-all" ] }
+html = { cmd = [ "coverage", "html" ], depends-on = [ "report" ] }
+
+[tool.pixi.feature.typecheck.tasks]
+typecheck = "pyright"
+
+[tool.pixi.pypi-dependencies]
+seamless_3dep = { path = ".", editable = true }
+
+[tool.pixi.workspace]
+channels = [ "conda-forge" ]
+platforms = [ "linux-64", "osx-64", "osx-arm64", "win-64" ]
 
 [tool.ruff]
 target-version = "py310"
 line-length = 100
 exclude = [ ".pixi", "__pycache__" ]
-[tool.ruff.lint]
-select = [
-  # flake8-bugbear
-  "B",
-  # flake8-comprehensions
-  "C4",
-  # pydocstyle
-  "D",
-  # Error
-  "E",
-  # pyflakes
-  "F",
-  # isort
-  "I",
-  # flake8-gettext
-  "INT",
-  # flake8-implicit-str-concat
-  "ISC",
-  # pep8-naming
-  "N",
-  # compatibility with numpy 2.0
-  "NPY201",
-  # Perflint
-  "PERF",
-  # pygrep-hooks
-  "PGH",
-  # misc lints
-  "PIE",
-  # pylint
-  "PLC",
-  "PLE",
-  "PLR",
-  "PLW",
-  # flake8-pytest-style
-  "PT",
-  # flake8-use-pathlib
-  "PTH",
-  # flake8-pyi
-  "PYI",
-  # flake8-quotes
-  "Q",
-  # Ruff-specific rules
-  "RUF",
-  # bandit
-  "S",
-  # flake8-simplify
-  "SIM",
-  # flake8-debugger
-  "T10",
-  # flake8-print
-  "T20",
-  # type-checking imports
-  "TC",
-  # tidy imports
-  "TID",
-  # tryceratops
-  "TRY",
-  # pyupgrade
-  "UP",
-  # Warning
-  "W",
-  # flake8-2020
-  "YTT",
+lint.select = [ "ALL" ]
+# Adopted from https://github.com/python-attrs/attrs/blob/main/pyproject.toml
+lint.ignore = [
+  "ANN",     # pyright is better at this
+  "ARG",     # unused arguments are normal when implementing interfaces
+  "B905",    # zip without strict is fine
+  "COM",     # ruff format takes care of our commas
+  "D",       # we prefer our own docstring style
+  "E501",    # leave line-length enforcement to ruff format
+  "FBT",     # we don't hate bool args around here
+  "FIX",     # yes, we want XXX as a marker
+  "ISC001",  # conflicts with ruff format
+  "N",       # we need more naming freedom
+  "PLC0415", # sometimes, imports have to live elsewhere
+  "PLR0913", # yes, many arguments, but most have defaults
+  "PLR2004", # numbers are sometimes fine
+  "TC001",   # first-party typing-only imports are cheap, keep simple for docs
+  "TC003",   # stdlib typing-only imports are cheap, keep simple for docs
+  "TRY301",  # raising within try/except is fine for us
 ]
-ignore = [
-  "D103",
-  "D105",
-  "E501",
-  # conflict with ruff-formatter
-  "ISC001",
-  "PLR0913",
-  "PLR2004",
-  # url schema
-  "S310",
-  "S603",
-  # shell command
-  "S605",
-  "S607",
-  # custom exception
-  "TRY003",
+lint.per-file-ignores."docs/*.py" = [
+  "A001",   # shadowing builtins like `license` is fine for file paths
+  "INP001", # no need for init files in docs
 ]
-per-file-ignores."seamless_3dep/seamless_3dep.py" = [
-  # specific type error ignored
-  "PGH003",
-]
-per-file-ignores."docs/examples/*.py" = [
+lint.per-file-ignores."docs/examples/*.{py,ipynb}" = [
   # notebook-generated files
   "B018",
   "D100",
+  # we have commented-out code in notebook headers
+  "ERA001",
 ]
-per-file-ignores."tests/*.py" = [
-  "D100",
-  "D101",
-  "D102",
-  "D103",
-  "D104",
-  "D105",
-  "D106",
-  "D107",
-  # specific type error ignored
-  "PGH003",
-  # use of "assert"
-  "S101",
+lint.per-file-ignores."tests/*.py" = [
+  "B015",    # pointless comparison in tests aren't pointless
+  "B017",    # pytest.raises(Exception) is fine
+  "B018",    # pointless expressions in tests aren't pointless
+  "BLE001",  # Blind excepts are fine in tests
+  "DTZ",     # datetime best practices don't matter in tests
+  "EM",      # no need for exception msg hygiene in tests
+  "INP001",  # no need for init files in tests
+  "PLR0124", # pointless comparison in tests aren't pointless
+  "PT011",   # broad is fine
+  "PT012",   # sometimes we need more than a single stmt
+  "RUF012",  # we don't do ClassVar annotations in tests
+  "S",       # security concerns don't matter in tests
+  "SIM201",  # sometimes we need to check `not ==`
+  "SIM202",  # sometimes we need to check `not ==`
+  "SIM300",  # Yoda rocks in asserts
+  "SLF001",  # private member access is fine in tests
+  "TRY",     # exception best practices don't matter in tests
 ]
-extend-safe-fixes = [
+lint.extend-safe-fixes = [
   # module level imports
   "E402",
   # break down assert
   "PT018",
-  # Move imports
-  "TC",
   # absolute imports
   "TID252",
 ]
-isort.known-first-party = [ "seamless_3dep" ]
-isort.required-imports = [ "from __future__ import annotations" ]
-pydocstyle.convention = "numpy"
+lint.isort.known-first-party = [ "seamless_3dep" ]
+lint.isort.required-imports = [ "from __future__ import annotations" ]
 
 [tool.codespell]
 skip = "__pycache__,_build,.mypy_cache,.git,./htmlcov,.pixi,pixi.lock,**.ipynb"
 ignore-words-list = "gage,gages"
 
 [tool.pyproject-fmt]
-table_format = "long"
+expand_tables = [ "tool.git-cliff", "tool.pixi" ]
 
-[tool.pytest.ini_options]
-addopts = [
+[tool.pyright]
+pythonVersion = "3.11"
+include = [ "src" ]
+ignore = [
+  "docs/examples/*.py",
+  "docs/examples/*.ipynb",
+  "tests/*.py",
+]
+typeCheckingMode = "strict"
+# Third-party libs in scientific Python often lack complete stubs
+reportMissingTypeStubs = false
+reportUnknownArgumentType = false
+reportUnknownLambdaType = false
+reportUnknownMemberType = false
+reportUnknownParameterType = false
+reportUnknownVariableType = false
+
+[tool.pytest]
+ini_options.addopts = [
   "--import-mode=importlib",
   "-v",
   "--cov",
@@ -231,78 +252,31 @@ addopts = [
   "--durations=5",
   "--basetemp=.pytest_tmp",
 ]
-doctest_optionflags = "NORMALIZE_WHITESPACE IGNORE_EXCEPTION_DETAIL NUMBER"
-markers = [
+ini_options.doctest_optionflags = "NORMALIZE_WHITESPACE IGNORE_EXCEPTION_DETAIL NUMBER"
+ini_options.markers = [
   "network: tests that make requests to external services",
 ]
-testpaths = [
+ini_options.testpaths = [
   "tests",
 ]
 
-[tool.coverage.paths]
-source = [ "src", "*/site-packages" ]
-[tool.coverage.report]
-exclude_lines = [
-  "if TYPE_CHECKING:",
-  "if sys.platform",
-]
-ignore_errors = true
-omit = [
-  "**/__init__.py",
-]
-[tool.coverage.run]
-branch = true
-parallel = true
-source_pkgs = [
+[tool.coverage]
+run.branch = true
+run.parallel = true
+run.source_pkgs = [
   "seamless_3dep",
 ]
-
-[tool.ty.environment]
-python-version = "3.10"
-[tool.ty.rules]
-all = "error"
-[tool.ty.src]
-include = [ "src/seamless_3dep" ]
-exclude = [
-  "**/__pycache__",
+paths.source = [ "src", "*/site-packages" ]
+report.exclude_lines = [
+  "if sys.platform",
+  "if TYPE_CHECKING:",
+]
+report.ignore_errors = true
+report.omit = [
   "**/__init__.py",
 ]
 
-[tool.pixi.environments]
-dev = { features = [ "dev", "py314" ] }
-test310 = { features = [ "test", "py310" ] }
-test314 = { features = [ "test", "py314" ] }
-typecheck = { features = [ "typecheck", "py314" ] }
-lint = { features = [ "lint", "py314" ], no-default-feature = true }
-docs = { features = [ "docs", "dev", "py314" ] }
-[tool.pixi.feature.dev.dependencies]
-libgdal-core = "*"
-nbconvert = ">=7.17.0,<8"
-[tool.pixi.feature.docs.tasks]
-docs-build = "mkdocs build --strict"
-docs-serve = { cmd = "mkdocs serve", depends-on = [ "docs-build" ] }
-docs-deploy = "mike deploy --push latest"
-docs-release = "mike deploy --push --update-aliases $(git describe --tags --abbrev=0) stable"
-[tool.pixi.feature.lint.tasks]
-lint = "pre-commit run --all-files"
-pcupdate = "pre-commit autoupdate"
-spell = "codespell -w"
-[tool.pixi.feature.py310.dependencies]
-python = "~=3.10.0"
-[tool.pixi.feature.py314.dependencies]
-python = "~=3.14.0"
-[tool.pixi.feature.test.dependencies]
-libgdal-core = "*"
-[tool.pixi.feature.test.tasks]
-test = "pytest -m 'not network'"
-test-network = "pytest -m network"
-test-all = "pytest"
-report = { cmd = [ "coverage", "report" ], depends-on = [ "test-all" ] }
-html = { cmd = [ "coverage", "html" ], depends-on = [ "report" ] }
-[tool.pixi.feature.typecheck.tasks]
-typecheck = "ty check"
-[tool.pixi.pypi-dependencies]
-seamless_3dep = { path = ".", editable = true }
-[tool.pixi.workspace]
-channels = [ "conda-forge" ]
-platforms = [ "linux-64", "osx-64", "osx-arm64", "win-64" ]
+[tool.jupytext]
+formats = "ipynb,py:percent"
+notebook_metadata_filter = "kernelspec,jupytext"
+cell_metadata_filter = "-all"

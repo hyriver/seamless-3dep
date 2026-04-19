@@ -50,9 +50,8 @@ class VRTPool:
                             nodata=pool.nodata,
                         )
                     except Exception as e:
-                        raise RuntimeError(
-                            f"Failed to open VRT for resolution {resolution}: {e}"
-                        ) from e
+                        msg = f"Failed to open VRT for resolution {resolution}: {e}"
+                        raise RuntimeError(msg) from e
         return cls._instances[resolution]
 
     @classmethod
