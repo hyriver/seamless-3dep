@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import math
 import os
@@ -11,7 +12,7 @@ from collections.abc import Generator, Iterable, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from itertools import islice, product
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, cast, overload
+from typing import TYPE_CHECKING, Any, Literal, cast, overload
 from urllib.parse import urlencode
 
 import numpy as np
@@ -67,12 +68,21 @@ VALID_MAP_TYPES = (
 )
 
 
-def _check_bbox(bbox: Sequence[float]) -> tuple[float, float, float, float]:
+def _check_deps(*packages: str, caller: str) -> None:
+    import importlib.util
+
+    missing = [p for p in packages if importlib.util.find_spec(p) is None]
+    if missing:
+        pkgs = "` and `".join(missing)
+        msg = f"`{caller}` requires `{pkgs}` to be installed."
+        raise ImportError(msg)
+
+
+def _check_bbox(bbox: Any) -> tuple[float, float, float, float]:
     """Validate that bbox is in correct form."""
     if not (isinstance(bbox, Sequence) and len(bbox) == 4 and all(map(math.isfinite, bbox))):
-        raise TypeError(
-            "`bbox` must be a tuple of form (west, south, east, north) in decimal degrees."
-        )
+        msg = "`bbox` must be a tuple of form (west, south, east, north) in decimal degrees."
+        raise TypeError(msg)
     return (bbox[0], bbox[1], bbox[2], bbox[3])
 
 
@@ -85,7 +95,8 @@ def _check_bounds(
     if not (
         bounds_west <= west < east <= bounds_east and bounds_south <= south < north <= bounds_north
     ):
-        raise ValueError(f"`bbox` must be within {bounds}.")
+        msg = f"`bbox` must be within {bounds}."
+        raise ValueError(msg)
 
 
 def _haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -103,7 +114,7 @@ def decompose_bbox(
     bbox: Sequence[float],
     res: int,
     pixel_max: int | None,
-    buff_npixels: float = 0.0,
+    buff_npixels: int = 0,
 ) -> tuple[list[tuple[float, float, float, float]], int, int]:
     """Divide a Bbox into equal-area sub-bboxes based on pixel count.
 
@@ -116,7 +127,7 @@ def decompose_bbox(
     pixel_max : int
         Maximum number of pixels allowed in each sub-bbox. If None, the bbox
         is not decomposed.
-    buff_npixels : float, optional
+    buff_npixels : int, optional
         Number of pixels to buffer each sub-bbox by, defaults to 0.
 
     Returns
@@ -124,16 +135,19 @@ def decompose_bbox(
     boxes : list of tuple
         List of sub-bboxes in the form (west, south, east, north).
     sub_width : int
-        Width of each sub-bbox in degrees.
+        Pixel width of each sub-bbox, including buffer pixels on both sides
+        when ``buff_npixels > 0``.
     sub_height : int
-        Height of each sub-bbox in degrees.
+        Pixel height of each sub-bbox, including buffer pixels on both sides
+        when ``buff_npixels > 0``.
     """
     west, south, east, north = _check_bbox(bbox)
     x_dist = _haversine_distance(south, west, south, east)
     y_dist = _haversine_distance(south, west, north, west)
 
     if res > min(x_dist, y_dist):
-        raise ValueError("Resolution must be less than the smallest dimension of the bbox.")
+        msg = "Resolution must be less than the smallest dimension of the bbox."
+        raise ValueError(msg)
 
     width = math.ceil(x_dist / res)
     height = math.ceil(y_dist / res)
@@ -162,7 +176,7 @@ def decompose_bbox(
             box_south = south + (j * dy) - buff_y
             box_north = min(south + ((j + 1) * dy), north) + buff_y
             boxes.append((box_west, box_south, box_east, box_north))
-    return boxes, sub_width, sub_height
+    return boxes, sub_width + 2 * buff_npixels, sub_height + 2 * buff_npixels
 
 
 def _clip_3dep(
@@ -202,6 +216,7 @@ def get_dem(
     save_dir: str | Path,
     res: Literal[10, 30, 60] = 10,
     pixel_max: int | None = MAX_PIXELS,
+    buff_npixels: int = 0,
 ) -> list[Path]:
     """Get DEM from 3DEP at 10, 30, or 60 meters resolutions.
 
@@ -224,6 +239,9 @@ def get_dem(
         into equal-area sub-bboxes, defaults to 8 million. If ``None``, the bbox
         is not decomposed and is downloaded as a single file. Values more than
         8 million are not allowed.
+    buff_npixels : int, optional
+        Number of pixels to buffer each sub-bbox by when the bbox is decomposed
+        into multiple tiles, defaults to 0 (no buffer).
 
     Returns
     -------
@@ -231,13 +249,15 @@ def get_dem(
         list of GeoTiff files containing the DEM clipped to the bounding box.
     """
     if res not in VRTLinks:
-        raise ValueError("`res` must be one of 10, 30, or 60 meters.")
+        msg = "`res` must be one of 10, 30, or 60 meters."
+        raise ValueError(msg)
 
     if pixel_max is not None and pixel_max > MAX_PIXELS:
-        raise ValueError(f"`pixel_max` must be less than {MAX_PIXELS}.")
+        msg = f"`pixel_max` must be less than {MAX_PIXELS}."
+        raise ValueError(msg)
 
     bbox = _check_bbox(bbox)
-    bbox_list, _, _ = decompose_bbox(bbox, res, pixel_max)
+    bbox_list, _, _ = decompose_bbox(bbox, res, pixel_max, buff_npixels)
 
     vrt_info = VRTPool.get_vrt_info(res)
     _check_bounds(bbox, vrt_info.bounds)
@@ -252,7 +272,7 @@ def get_dem(
     vrt_url = VRTLinks[res]
     max_workers = min(4, os.cpu_count() or 1, len(bbox_list))
     if max_workers == 1:
-        for box, path in zip(bbox_list, tiff_list, strict=True):
+        for box, path in zip(bbox_list, tiff_list, strict=False):
             _clip_3dep(vrt_url, box, path, vrt_info.transform, vrt_info.nodata)
         return tiff_list
 
@@ -262,7 +282,7 @@ def get_dem(
                 box,
                 path,
             )
-            for box, path in zip(bbox_list, tiff_list, strict=True)
+            for box, path in zip(bbox_list, tiff_list, strict=False)
         }
         for future in as_completed(future_to_url):
             try:
@@ -278,6 +298,7 @@ def get_map(
     save_dir: str | Path,
     res: int = 10,
     pixel_max: int | None = MAX_PIXELS,
+    buff_npixels: int = 0,
 ) -> list[Path]:
     """Get topo maps in 3857 coordinate system within US from 3DEP at any resolution.
 
@@ -309,6 +330,9 @@ def get_map(
         into equal-area sub-bboxes, defaults to 8 million. If ``None``, the bbox
         is not decomposed and is downloaded as a single file. Values more than
         8 million are not allowed.
+    buff_npixels : int, optional
+        Number of pixels to buffer each sub-bbox by when the bbox is decomposed
+        into multiple tiles, defaults to 0 (no buffer).
 
     Returns
     -------
@@ -316,13 +340,15 @@ def get_map(
         list of GeoTiff files containing the DEM clipped to the bounding box.
     """
     if map_type not in VALID_MAP_TYPES:
-        raise ValueError(f"`map_type` must be one of {VALID_MAP_TYPES}.")
+        msg = f"`map_type` must be one of {VALID_MAP_TYPES}."
+        raise ValueError(msg)
 
     if pixel_max is not None and pixel_max > MAX_PIXELS:
-        raise ValueError(f"`pixel_max` must be less than {MAX_PIXELS}.")
+        msg = f"`pixel_max` must be less than {MAX_PIXELS}."
+        raise ValueError(msg)
 
     bbox = _check_bbox(bbox)
-    bbox_list, sub_width, sub_height = decompose_bbox(bbox, res, pixel_max)
+    bbox_list, sub_width, sub_height = decompose_bbox(bbox, res, pixel_max, buff_npixels)
 
     _check_bounds(bbox, (-180.0, -15.0, 180.0, 84.0))
     save_dir = Path(save_dir)
@@ -386,13 +412,15 @@ def build_vrt(vrt_path: str | Path, tiff_files: list[str] | list[Path]) -> None:
         List of file paths to include in the VRT.
     """
     if shutil.which("gdalbuildvrt") is None:
-        raise ImportError("GDAL (`libgdal-core`) is required to run `build_vrt`.")
+        msg = "GDAL (`libgdal-core`) is required to run `build_vrt`."
+        raise ImportError(msg)
 
     vrt_path = Path(vrt_path).resolve()
     tiff_files = [Path(f).resolve() for f in tiff_files]
 
     if not tiff_files or not all(f.exists() for f in tiff_files):
-        raise ValueError("No valid files found.")
+        msg = "No valid files found."
+        raise ValueError(msg)
 
     command = [
         "gdalbuildvrt",
@@ -403,10 +431,40 @@ def build_vrt(vrt_path: str | Path, tiff_files: list[str] | list[Path]) -> None:
         *_path2str(tiff_files),
     ]
     try:
-        subprocess.run(command, check=True, text=True, capture_output=True)
+        subprocess.run(command, check=True, text=True, capture_output=True)  # noqa: S603
     except subprocess.CalledProcessError as e:
         msg = f"Command '{' '.join(e.cmd)}' failed with error:\n{e.stderr.strip()}"
         raise RuntimeError(msg) from e
+
+
+def _to_poly(
+    geometry: Polygon | Sequence[float],
+) -> tuple[Polygon, bool]:
+    """Return a Shapely geometry and optionally transform to a new CRS.
+
+    Parameters
+    ----------
+    geometry : shaple.Geometry or tuple of length 4
+        Any shapely geometry object or a bounding box (minx, miny, maxx, maxy).
+
+    Returns
+    -------
+    geom : shapely.geometry.base.BaseGeometry
+        A shapely geometry object.
+    is_bbox : bool
+        Whether the input geometry was a bounding box.
+    """
+    import shapely
+
+    is_geom = np.atleast_1d(shapely.is_geometry(geometry))
+    if is_geom.all() and len(is_geom) == 1:
+        ring = shapely.get_exterior_ring(geometry)  # pyright: ignore[reportCallIssue,reportArgumentType]
+        with contextlib.suppress(ValueError):
+            return shapely.Polygon(ring), False
+    if isinstance(geometry, Iterable) and len(geometry) == 4 and np.isfinite(geometry).all():
+        return shapely.box(*geometry), True  # pyright: ignore[reportCallIssue,reportArgumentType]
+    msg = "geometry must be a shapely geometry or tuple of length 4"
+    raise TypeError(msg)
 
 
 def tiffs_to_da(
@@ -428,30 +486,20 @@ def tiffs_to_da(
     xarray.DataArray
         DataArray containing the clipped data.
     """
-    try:
-        import rioxarray as rxr  # noqa: PLC0415
-        import shapely  # noqa: PLC0415
-    except ImportError as e:
-        msg = "`tiffs_to_da` requires `shapely` and `rioxarray` to be installed."
-        raise ImportError(msg) from e
+    _check_deps("shapely", "rioxarray", caller="tiffs_to_da")
+    import rioxarray as rxr
 
-    if not isinstance(tiff_files, Iterable):
-        raise TypeError("`tiff_files` must be an iterable of file paths.")
+    if not isinstance(tiff_files, Iterable):  # pyright: ignore[reportUnnecessaryIsInstance]
+        msg_0 = "`tiff_files` must be an iterable of file paths."
+        raise TypeError(msg_0)
 
-    is_bbox = isinstance(geometry, Sequence) and not isinstance(geometry, shapely.Polygon)
-    if is_bbox:
-        geom = shapely.box(*_check_bbox(geometry))
-    elif isinstance(geometry, shapely.Polygon):
-        geom = geometry
-    else:
-        raise TypeError(
-            "`geometry` must be a shapely Polygon or an iterable of form (west, south, east, north)."
-        )
+    geom, is_bbox = _to_poly(geometry)
 
     tiff_files = [Path(f).resolve() for f in tiff_files]
 
     if not tiff_files or not all(f.exists() for f in tiff_files):
-        raise ValueError("No valid files found.")
+        msg_0 = "No valid files found."
+        raise ValueError(msg_0)
 
     first = tiff_files[0]
     if len(tiff_files) == 1:
@@ -552,7 +600,7 @@ def _sample_window(
             data = dataset.read(
                 indexes,
                 window=rasterio.windows.Window(
-                    col_start,  # ty: ignore[too-many-positional-arguments]
+                    col_start,  # pyright: ignore[reportCallIssue]
                     row_start,
                     window,
                     window,
@@ -608,7 +656,8 @@ def elevation_bygrid(
         values in meters.
     """
     if window % 2 == 0:
-        raise ValueError("`window` must be an odd integer.")
+        msg = "`window` must be an odd integer."
+        raise ValueError(msg)
 
     longs_arr = np.asarray(longs, dtype=np.float64)
     lats_arr = np.asarray(lats, dtype=np.float64)

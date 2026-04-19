@@ -56,7 +56,12 @@ def test_decompose_bbox_with_division(valid_bbox: tuple[float, float, float, flo
 def test_decompose_bbox_with_buffer():
     """Test decompose_bbox with buffer."""
     bbox = (-122.0, 37.0, -121.0, 38.0)
-    boxes, *_ = s3dep.decompose_bbox(bbox, 30, 1000, buff_npixels=2)
+    buff = 2
+    _, sub_w_nobuff, sub_h_nobuff = s3dep.decompose_bbox(bbox, 30, 1000)
+    boxes, sub_w, sub_h = s3dep.decompose_bbox(bbox, 30, 1000, buff_npixels=buff)
+    # Returned pixel dims include buffer on both sides
+    assert sub_w == sub_w_nobuff + 2 * buff
+    assert sub_h == sub_h_nobuff + 2 * buff
     # Check that boxes overlap due to buffer
     for i in range(len(boxes) - 1):
         current_box = boxes[i]
