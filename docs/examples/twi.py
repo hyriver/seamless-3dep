@@ -63,13 +63,13 @@ geom = vrain.to_crs(3857).buffer(5e3).to_crs(4326).union_all()
 
 data_dir = Path("data")
 tiff_files = s3dep.get_map("DEM", geom.bounds, data_dir, 10, buff_npixels=10)
-print(f"Number of tiles: {len(tiff_files)}")
 
 # %% [markdown]
 # Define a per-tile TWI function that runs the full WhiteboxTools pipeline
 # in an isolated temporary directory and returns the path to the TWI
 # output. Each worker gets its own scratch space so there is no contention
 # over the intermediate file names.
+
 
 # %%
 def compute_twi(dem_path: Path) -> Path:
