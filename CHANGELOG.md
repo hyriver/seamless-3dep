@@ -5,11 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.5.0] - 2026-04-19
 
 ### Added
 
+- Add a `buff_npixels` parameter to `get_dem` and `get_map` that is forwarded to
+    `decompose_bbox` to produce overlapping tiles. This is intended for workflows that
+    post-process each tile independently (e.g., running geospatial operations in
+    parallel on a per-tile basis) where a small halo of extra pixels around each tile
+    avoids edge artifacts in the per-tile outputs. Defaults to `0` to preserve existing
+    behavior. Closes [#28](https://github.com/hyriver/seamless-3dep/issues/28).
+- Add a new `twi.ipynb` example notebook that demonstrates computing Topographic Wetness
+    Index in parallel across buffered DEM tiles, then mosaicking the results.
+
 ### Changed
+
+- Update `decompose_bbox` so the returned `sub_width` and `sub_height` reflect the
+    actual per-tile pixel dimensions including buffer pixels on both sides when
+    `buff_npixels > 0`. Previously the returned pixel counts ignored the buffer, which
+    would have caused `get_map` to request the wrong output size from the 3DEP export
+    service when combined with a non-zero buffer.
+- Trim the `dem.ipynb` example to focus on DEM and slope retrieval; the per-tile TWI
+    workflow is now covered by the dedicated `twi.ipynb` example.
 
 ## [0.4.1] - 2026-03-13
 

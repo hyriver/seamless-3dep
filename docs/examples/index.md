@@ -17,4 +17,7 @@ This will create a new environment called `3dep` with all the required packages.
 - [![Elevation Grid](images/elevation_grid.png){ loading=lazy }](elevation.ipynb "Elevation Grid")
     **Elevation Grid**
 
+- [![Parallel TWI](images/twi.png){ loading=lazy }](twi.ipynb "Parallel TWI on Buffered Tiles")
+    **Parallel TWI on Buffered Tiles**
+
 </div>

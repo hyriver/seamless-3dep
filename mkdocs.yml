@@ -105,6 +105,7 @@ nav:
   - Overview: examples/index.md
   - DEM Processing: examples/dem.ipynb
   - Elevation Grid: examples/elevation.ipynb
+  - Parallel TWI on Buffered Tiles: examples/twi.ipynb
 - API Reference: reference.md
 - Release Notes: CHANGELOG.md
 - Contributing: CONTRIBUTING.md

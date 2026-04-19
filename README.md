@@ -55,11 +55,13 @@ processing:
 
 - `get_dem`: Retrieves static DEMs within a specified bounding box. The function
     automatically splits large areas into manageable tiles, downloads data as GeoTIFF
-    files in EPSG:4326, and supports resolutions of 10m, 30m, or 60m.
+    files in EPSG:4326, and supports resolutions of 10m, 30m, or 60m. A `buff_npixels`
+    option produces overlapping tiles to avoid NoData strips along seams when mosaicking
+    with `tiffs_to_da`.
 - `get_map`: Fetches any 3DEP product (including DEMs) with customizable parameters.
     Works with all available product types, allows custom resolution settings, and
     downloads in EPSG:3857. Due to service limitations, the output projection is not
-    configurable.
+    configurable. Also accepts `buff_npixels` for overlapping tiles.
 - `elevation_bygrid`: Samples elevation values from the 10 m seamless DEM at a grid of
     longitude/latitude coordinates. Reads directly from the USGS Cloud-Optimized
     GeoTIFFs (EPSG:4269) and supports configurable resampling methods including nearest,
