@@ -27,6 +27,7 @@ repos:
     exclude: ^LICENSE|\.(html|csv|txt|svg|py)$
   - id: pretty-format-json
     args: [--autofix, --no-ensure-ascii, --no-sort-keys]
+    exclude: ^docs/examples/.*\.ipynb$
   - id: trailing-whitespace
     args: [--markdown-linebreak-ext=md]
     exclude: \.(html|svg)$
@@ -37,6 +38,13 @@ repos:
   - id: ssort
     name: Sort top level statements with ssort
     exclude: ^docs/examples/notebooks/.*\.py$
+
+- repo: https://github.com/mwouts/jupytext
+  rev: v1.19.1
+  hooks:
+  - id: jupytext
+    args: [--sync]
+    files: ^docs/examples/.*\.(py|ipynb)$
 
 - repo: https://github.com/astral-sh/ruff-pre-commit
   rev: v0.15.11
