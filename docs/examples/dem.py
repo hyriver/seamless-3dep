@@ -48,7 +48,6 @@ tiff_files = s3dep.get_map("DEM", geom.bounds, data_dir, 10)
 
 # %%
 dem = s3dep.tiffs_to_da(tiff_files, geom_org.bounds, crs=4326)
-dem.size
 
 # %%
 ax = dem.plot.imshow(robust=True)

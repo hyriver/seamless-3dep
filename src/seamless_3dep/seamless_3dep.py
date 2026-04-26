@@ -179,6 +179,34 @@ def decompose_bbox(
     return boxes, sub_width + 2 * buff_npixels, sub_height + 2 * buff_npixels
 
 
+def _snap_window(window: rasterio.windows.Window) -> rasterio.windows.Window:
+    """Snap a fractional Window to integer pixel boundaries.
+
+    ``rasterio.windows.from_bounds`` returns a Window with fractional
+    offsets and lengths. If we hand that to GDAL as-is, the float-to-int
+    coercion done internally when writing the GeoTIFF can leave each
+    saved tile with a slightly different rounded pixel grid. Adjacent
+    tiles then land at sub-pixel-misaligned bounds, producing the small
+    NoData strips reported in [#28].
+
+    Snapping the upper-left corner and the lower-right corner separately
+    (rather than rounding offset and length independently) guarantees
+    that two tiles whose shared edge lies on a bit-identical fractional
+    pixel position round to the same integer pixel, so they tile
+    exactly without gap or overlap.
+    """
+    col_off = round(window.col_off)
+    row_off = round(window.row_off)
+    col_end = round(window.col_off + window.width)
+    row_end = round(window.row_off + window.height)
+    return rasterio.windows.Window(
+        col_off,  # pyright: ignore[reportCallIssue]
+        row_off,
+        col_end - col_off,
+        row_end - row_off,
+    )
+
+
 def _clip_3dep(
     vrt_url: str,
     box: tuple[float, float, float, float],
@@ -188,7 +216,7 @@ def _clip_3dep(
 ) -> None:
     """Clip 3DEP to a bbox and save it as a GeoTiff file with NaN as nodata."""
     if not tiff_path.exists():
-        window = rasterio.windows.from_bounds(*box, transform=transform)
+        window = _snap_window(rasterio.windows.from_bounds(*box, transform=transform))
         with rasterio.open(vrt_url) as src:
             meta = src.meta.copy()
             meta.update(

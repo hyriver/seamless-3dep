@@ -7,6 +7,17 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [0.5.0] - 2026-04-19
 
+### Fixed
+
+- Snap the read window in `_clip_3dep` to integer pixel boundaries before writing each
+    sub-tile. `rasterio.windows.from_bounds` returns a Window with fractional offsets
+    and lengths; with the old code, GDAL's float-to-int coercion when serialising the
+    GeoTIFF could leave each saved tile on a slightly different rounded pixel grid,
+    producing the sub-pixel (~half-pixel, ~4 m at 10 m DEM) NoData strip seen at tile
+    seams in external mosaics. After the fix, adjacent tiles share an exact pixel grid
+    and tile cleanly without `buff_npixels`. Resolves the seam reproduced in
+    [#28](https://github.com/hyriver/seamless-3dep/issues/28).
+
 ### Added
 
 - Add a `buff_npixels` parameter to `get_dem` and `get_map` that is forwarded to

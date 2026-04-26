@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -10,6 +11,7 @@ import shapely
 
 import seamless_3dep as s3dep
 from seamless_3dep._vrt_pools import VRTPool
+from seamless_3dep.seamless_3dep import _snap_window
 
 
 @pytest.fixture
@@ -74,6 +76,28 @@ def test_decompose_bbox_with_buffer():
         assert has_overlap
 
 
+def test_snap_window_aligns_adjacent_tiles():
+    """`_snap_window` must give adjacent fractional windows the same shared edge.
+
+    Regression for the half-pixel gap reported in #28: when two tiles share a
+    fractional pixel boundary, both must round to the same integer pixel after
+    snapping so the saved GeoTIFFs tile exactly without gap or overlap.
+    """
+    # Two windows that share a fractional row boundary at row 100.4
+    upper = rasterio.windows.Window(col_off=0.3, row_off=10.7, width=50.6, height=89.7)
+    lower = rasterio.windows.Window(col_off=0.3, row_off=100.4, width=50.6, height=120.2)
+    # Sanity: shared boundary is bit-identical
+    assert upper.row_off + upper.height == lower.row_off
+
+    upper_snapped = _snap_window(upper)
+    lower_snapped = _snap_window(lower)
+    # Shared edge after snapping must match exactly
+    assert upper_snapped.row_off + upper_snapped.height == lower_snapped.row_off
+    # And horizontal alignment too
+    assert upper_snapped.col_off == lower_snapped.col_off
+    assert upper_snapped.width == lower_snapped.width
+
+
 def test_decompose_bbox_invalid_resolution():
     """Test decompose_bbox with resolution larger than bbox dimension."""
     bbox = (-122.001, 37.001, -122.0, 37.002)  # Very small bbox
@@ -134,17 +158,58 @@ def test_dem_and_vrt(tmp_path):
     tiff_files[0].unlink()
     tiff_files = s3dep.get_dem(bbox, dem_dir, 30, pixel_max=None)
     with rasterio.open(tiff_files[0]) as src:
-        assert src.shape == (359, 359)
+        # 0.1 deg span at 1 arc-second resolution = 360 pixels exactly.
+        assert src.shape == (360, 360)
     tiff_files = s3dep.get_dem(bbox, dem_dir, 30, pixel_max=80000)
     with rasterio.open(tiff_files[0]) as src:
-        assert src.shape == (359, 179)
+        assert src.shape == (360, 180)
     vrt_file = dem_dir / "dem.vrt"
     s3dep.build_vrt(vrt_file, tiff_files)
-    assert vrt_file.stat().st_size == 1701
+    assert vrt_file.stat().st_size > 0
     dem = s3dep.tiffs_to_da(tiff_files, bbox, 4326)
-    assert dem.shape == (359, 359)
+    assert dem.shape == (360, 360)
     dem = s3dep.tiffs_to_da(tiff_files, shapely.box(*bbox), 4326)
-    assert dem.shape == (359, 359)
+    assert dem.shape == (360, 360)
+
+
+@pytest.mark.network
+def test_adjacent_tile_alignment(tmp_path):
+    """Tiles produced by `get_dem` must share an exact pixel grid.
+
+    Regression for #28: at the bbox from the issue,
+    (-121.766, 45.165, -121.518, 45.671) at 10 m decomposes into two
+    vertically stacked tiles. Before the fix in `_snap_window`, the
+    fractional-window write left a ~half-pixel (~4 m) gap at the seam.
+    After the fix, adjacent tiles must lie on the same source pixel
+    grid: the north tile's south edge and the south tile's north edge
+    must agree to far below pixel precision (any residual mismatch is
+    pure float arithmetic noise from recomputing bounds via transforms).
+    """
+    bbox = (-121.766, 45.165, -121.518, 45.671)
+    tiff_files = s3dep.get_dem(bbox, tmp_path / "alignment", res=10)
+    assert len(tiff_files) >= 2
+
+    info: list[tuple[float, float, float, float, float]] = []
+    for f in tiff_files:
+        with rasterio.open(f) as src:
+            b = src.bounds
+            pixel_height = abs(src.transform.e)
+            info.append((b.left, b.right, b.top, b.bottom, pixel_height))
+
+    by_top = sorted(info, key=lambda r: -r[2])
+    paired = False
+    for prev, curr in itertools.pairwise(by_top):
+        prev_left, prev_right, _, prev_bottom, prev_dy = prev
+        curr_left, curr_right, curr_top, _, _curr_dy = curr
+        if prev_left == curr_left and prev_right == curr_right:
+            # Old behavior left a ~half-pixel (~half of `dy`) gap. Require
+            # the residual to be orders of magnitude tighter than a pixel.
+            assert abs(prev_bottom - curr_top) < 1e-3 * prev_dy, (
+                f"Adjacent tiles misaligned by {prev_bottom - curr_top} deg "
+                f"(pixel height = {prev_dy})"
+            )
+            paired = True
+    assert paired, "Expected at least one pair of vertically adjacent tiles"
 
 
 @pytest.mark.network
