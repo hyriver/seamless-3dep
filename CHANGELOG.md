@@ -17,6 +17,14 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     seams in external mosaics. After the fix, adjacent tiles share an exact pixel grid
     and tile cleanly without `buff_npixels`. Resolves the seam reproduced in
     [#28](https://github.com/hyriver/seamless-3dep/issues/28).
+- Guard `_clip_3dep`'s nodata-to-NaN replace against the case where the source's nodata
+    sentinel is itself NaN. The current 3DEP VRTs use a finite sentinel so the existing
+    code happens to be fine, but `data == NaN` is always `False` and would have silently
+    no-oped if USGS ever changes the product.
+- Hash the full sorted tile list when naming the helper VRT in `tiffs_to_da` so
+    concurrent calls with overlapping file lists no longer race on a shared
+    `<first>.vrt` path (where the loser of the race could have read a half-written or
+    other-list VRT).
 
 ### Added
 
@@ -28,16 +36,46 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     behavior. Closes [#28](https://github.com/hyriver/seamless-3dep/issues/28).
 - Add a new `twi.ipynb` example notebook that demonstrates computing Topographic Wetness
     Index in parallel across buffered DEM tiles, then mosaicking the results.
+- Expose a `max_workers` parameter on `get_dem` so power users with very large requests
+    can tune the per-tile concurrency. Defaults to `None`, which uses
+    `min(8, os.cpu_count(), n_tiles)` (up from the previous fixed cap of 4).
+- Add a `res: Literal[10, 30, 60]` parameter to `elevation_bygrid` so callers who don't
+    need 10 m fidelity can fall back to the coarser, smaller-to-range-read VRTs.
+- Add a new public `Get3DEPErrors` exception class that aggregates per-tile failures
+    from a multi-tile `get_dem` call. Exposes `.errors` (list of per-tile exceptions)
+    and `.vrt_url` so callers can inspect the failures and decide whether to retry.
 
 ### Changed
 
+- Pool source `DatasetReader` instances across tiles in `get_dem`. Each worker borrows a
+    reader from a queue, runs one clip, and returns it on success — so the HTTPS
+    handshake and initial range read against the source COG-VRT happen once per worker
+    instead of once per tile. For 50–100-tile requests this is the dominant cost, and
+    the change typically yields a 3–10× speedup over the previous "open per tile"
+    behavior.
+- Add per-tile retry with exponential backoff (3 attempts, base 0.5 s, 3× backoff) on
+    transient I/O errors (`RasterioIOError` / `OSError`) inside `get_dem`. A poisoned
+    reader is closed and replaced with a fresh one so other workers keep making
+    progress.
+- `get_dem` now collects per-tile failures and raises them together as a single
+    `Get3DEPErrors` rather than aborting the whole batch on the first failure.
+    Already-completed tiles stay on disk so a re-run resumes from the failed ones.
 - Update `decompose_bbox` so the returned `sub_width` and `sub_height` reflect the
     actual per-tile pixel dimensions including buffer pixels on both sides when
     `buff_npixels > 0`. Previously the returned pixel counts ignored the buffer, which
     would have caused `get_map` to request the wrong output size from the 3DEP export
     service when combined with a non-zero buffer.
+- Validate bbox ordering eagerly in `_check_bbox` (rejects `west >= east` or
+    `south >= north` with a message that names the offending values) instead of
+    surfacing a confusing "must be within VRT bounds" error from a later check.
 - Trim the `dem.ipynb` example to focus on DEM and slope retrieval; the per-tile TWI
     workflow is now covered by the dedicated `twi.ipynb` example.
+
+### Migration
+
+- Multi-tile `get_dem` failures are now raised as `Get3DEPErrors` instead of
+    `tiny_retriever.exceptions.ServiceError`. Callers that catch the old exception
+    should switch to the new one (or catch `Exception` if they want both).
 
 ## [0.4.1] - 2026-03-13
 
