@@ -663,6 +663,7 @@ def tiffs_to_da(
     """
     _check_deps("shapely", "rioxarray", caller="tiffs_to_da")
     import rioxarray as rxr
+    import xarray as xr
 
     if not isinstance(tiff_files, Iterable):  # pyright: ignore[reportUnnecessaryIsInstance]
         msg_0 = "`tiff_files` must be an iterable of file paths."
@@ -688,14 +689,14 @@ def tiffs_to_da(
         ).hexdigest()[:16]
         file = sorted_files[0].parent / f"_s3dep_mosaic_{list_hash}.vrt"
         build_vrt(file, tiff_files)
-    da = (
-        cast(
-            "DataArray",
-            rxr.open_rasterio(file),
+    da = rxr.open_rasterio(file)
+    if not isinstance(da, xr.DataArray):
+        msg = (
+            f"`rioxarray.open_rasterio({file.as_posix()})` returned "
+            f"{type(da).__name__}, expected DataArray."
         )
-        .squeeze(drop=True)
-        .rio.clip_box(*geom.bounds, crs=crs)
-    )
+        raise TypeError(msg)
+    da = da.squeeze(drop=True).rio.clip_box(*geom.bounds, crs=crs)
     if not is_bbox:
         da = da.rio.clip([geom], crs=crs)
     return da
