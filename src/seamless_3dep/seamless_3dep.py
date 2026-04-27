@@ -304,22 +304,20 @@ def _clip_with_retry(
     locking serialises individual reads on the dataset object, so a
     transient network blip on one read leaves the dataset usable for
     subsequent reads — no replacement needed. Up to ``_RETRY_ATTEMPTS``
-    attempts with exponential backoff.
+    attempts with exponential backoff; the original exception is
+    re-raised after the last failed attempt.
     """
     delay = _RETRY_BASE_DELAY
-    last_error: BaseException | None = None
     for attempt in range(_RETRY_ATTEMPTS):
         try:
             _clip_with_src(src, box, path, transform, nodata)
-        except _RETRY_EXCEPTIONS as exc:
-            last_error = exc
-            if attempt < _RETRY_ATTEMPTS - 1:
-                time.sleep(delay)
-                delay *= _RETRY_BACKOFF
+        except _RETRY_EXCEPTIONS:
+            if attempt == _RETRY_ATTEMPTS - 1:
+                raise
+            time.sleep(delay)
+            delay *= _RETRY_BACKOFF
         else:
             return
-    if last_error is not None:
-        raise last_error
 
 
 def _run_clip_pool(
@@ -327,7 +325,7 @@ def _run_clip_pool(
     todo: list[tuple[tuple[float, float, float, float], Path]],
     transform: Affine,
     nodata: float,
-    max_workers: int,
+    n_workers: int,
 ) -> None:
     """Clip a batch of sub-bboxes from ``vrt_url`` concurrently.
 
@@ -349,14 +347,14 @@ def _run_clip_pool(
     """
     if not todo:
         return
-    n_workers = max(1, min(max_workers, len(todo)))
 
+    http_env = rasterio.Env(
+        GDAL_HTTP_MAX_CACHED_CONNECTIONS=str(n_workers),
+        GDAL_HTTP_MULTIPLEX="YES",
+    )
     errors: list[BaseException] = []
     with (
-        rasterio.Env(
-            GDAL_HTTP_MAX_CACHED_CONNECTIONS=str(n_workers),
-            GDAL_HTTP_MULTIPLEX="YES",
-        ),
+        http_env,
         rasterio.open(vrt_url, thread_safe=True) as src,
         ThreadPoolExecutor(max_workers=n_workers) as executor,
     ):
