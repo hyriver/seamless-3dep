@@ -229,7 +229,10 @@ def _clip_3dep(
                 }
             )
             data = src.read(window=window)
-        data[data == nodata] = math.nan
+        # `data == nodata` silently no-ops when nodata is NaN (NaN != NaN); guard
+        # so a future change to the source's nodata sentinel doesn't slip through.
+        if not math.isnan(nodata):
+            data[data == nodata] = math.nan
         with rasterio.open(tiff_path, "w", **meta) as dst:
             dst.write(data)
 
@@ -529,11 +532,17 @@ def tiffs_to_da(
         msg_0 = "No valid files found."
         raise ValueError(msg_0)
 
-    first = tiff_files[0]
     if len(tiff_files) == 1:
-        file = first
+        file = tiff_files[0]
     else:
-        file = first.with_suffix(".vrt")
+        # Hash the full sorted tile list so concurrent calls with different file
+        # sets don't race on a shared `<first>.vrt` path (which would otherwise
+        # be overwritten and consumed mid-flight by the loser of the race).
+        sorted_files = sorted(tiff_files)
+        list_hash = hashlib.sha256(
+            "\n".join(p.as_posix() for p in sorted_files).encode()
+        ).hexdigest()[:16]
+        file = sorted_files[0].parent / f"_s3dep_mosaic_{list_hash}.vrt"
         build_vrt(file, tiff_files)
     da = (
         cast(
