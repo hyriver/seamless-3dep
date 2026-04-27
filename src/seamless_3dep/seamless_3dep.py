@@ -258,39 +258,6 @@ def _snap_window(window: rasterio.windows.Window) -> rasterio.windows.Window:
     )
 
 
-def _clip_with_src(
-    src: DatasetReader,
-    box: tuple[float, float, float, float],
-    tiff_path: Path,
-    transform: Affine,
-    nodata: float,
-) -> None:
-    """Single-attempt clip using an already-open source ``DatasetReader``.
-
-    Caller is responsible for opening and closing ``src`` and for skipping
-    already-cached tiles. Kept separate from the retry/pool driver so the
-    happy path stays trivially testable.
-    """
-    window = _snap_window(rasterio.windows.from_bounds(*box, transform=transform))
-    meta = src.meta.copy()
-    meta.update(
-        {
-            "driver": "GTiff",
-            "height": window.height,
-            "width": window.width,
-            "transform": rasterio.windows.transform(window, transform),
-            "nodata": math.nan,
-        }
-    )
-    data = src.read(window=window)
-    # `data == nodata` silently no-ops when nodata is NaN (NaN != NaN); guard
-    # so a future change to the source's nodata sentinel doesn't slip through.
-    if not math.isnan(nodata):
-        data[data == nodata] = math.nan
-    with rasterio.open(tiff_path, "w", **meta) as dst:
-        dst.write(data)
-
-
 def _clip_with_retry(
     src: DatasetReader,
     box: tuple[float, float, float, float],
@@ -298,19 +265,33 @@ def _clip_with_retry(
     transform: Affine,
     nodata: float,
 ) -> None:
-    """Clip one tile, retrying with backoff on transient I/O errors.
+    """Clip one tile from ``src`` to ``path``, retrying on transient I/O errors.
 
     Reads through a shared thread-safe ``DatasetReader``. GDAL's internal
-    locking serialises individual reads on the dataset object, so a
+    locking serializes individual reads on the dataset object, so a
     transient network blip on one read leaves the dataset usable for
     subsequent reads — no replacement needed. Up to ``_RETRY_ATTEMPTS``
     attempts with exponential backoff; the original exception is
     re-raised after the last failed attempt.
     """
+    window = _snap_window(rasterio.windows.from_bounds(*box, transform=transform))
+    meta = src.meta | {
+        "driver": "GTiff",
+        "height": window.height,
+        "width": window.width,
+        "transform": rasterio.windows.transform(window, transform),
+        "nodata": math.nan,
+    }
     delay = _RETRY_BASE_DELAY
     for attempt in range(_RETRY_ATTEMPTS):
         try:
-            _clip_with_src(src, box, path, transform, nodata)
+            data = src.read(window=window)
+            # `data == nodata` silently no-ops when nodata is NaN (NaN != NaN);
+            # guard so a future change to the source sentinel doesn't slip through.
+            if not math.isnan(nodata):
+                data[data == nodata] = math.nan
+            with rasterio.open(path, "w", **meta) as dst:
+                dst.write(data)
         except _RETRY_EXCEPTIONS:
             if attempt == _RETRY_ATTEMPTS - 1:
                 raise
@@ -330,7 +311,7 @@ def _run_clip_pool(
     """Clip a batch of sub-bboxes from ``vrt_url`` concurrently.
 
     Opens a single thread-safe ``DatasetReader`` (rasterio 1.5+, GDAL 3.10+)
-    and shares it across all workers — GDAL itself serialises individual
+    and shares it across all workers — GDAL itself serializes individual
     reads, so we incur the HTTPS handshake and initial header read exactly
     once per batch instead of once per worker. Per-tile failures are
     collected and raised together as a single :class:`Get3DEPErrors`, so a
@@ -342,7 +323,7 @@ def _run_clip_pool(
       default of 5 to ``n_workers`` so concurrent range reads don't
       contend on a too-small connection pool.
     - ``GDAL_HTTP_MULTIPLEX=YES`` enables HTTP/2 multiplexing, which AWS
-      S3 supports and which lets concurrent range reads share one TLS
+      S3 supports and lets concurrent range reads share one TLS
       connection rather than opening fresh sockets.
     """
     if not todo:

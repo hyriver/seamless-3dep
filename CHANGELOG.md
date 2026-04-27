@@ -58,7 +58,7 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     and `.vrt_url` so callers can inspect the failures and decide whether to retry.
 - Expose a `pixel_function` keyword on `build_vrt` and `tiffs_to_da`, forwarded to
     `gdalbuildvrt -pixel-function` (GDAL 3.12+). Defaults to `None`, which keeps
-    `gdalbuildvrt`'s "last input wins" behaviour for overlapping pixels. Useful when
+    `gdalbuildvrt`'s "last input wins" behavior for overlapping pixels. Useful when
     mosaicking per-tile post-processed outputs (e.g., the TWI example) where overlap
     pixels can differ between tiles — `pixel_function="mean"` or `"first"` makes the
     merge deterministic. Common values: `"first"`, `"mean"`, `"median"`, `"min"`,
@@ -68,7 +68,7 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 - Open the source COG-VRT once per `get_dem` batch with
     `rasterio.open(..., thread_safe=True)` (rasterio 1.5+) and share that single
-    `DatasetReader` across all worker threads. GDAL serialises individual reads on the
+    `DatasetReader` across all worker threads. GDAL serializes individual reads on the
     dataset object internally, so we incur the HTTPS handshake and initial header read
     exactly once per batch instead of once per tile. For 50–100-tile requests this is
     the dominant cost, and the change typically yields a 3–10× speedup over the previous
