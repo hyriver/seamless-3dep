@@ -22,7 +22,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        environment: [test310, test314]
+        environment: [test312, test314]
 
     steps:
     - uses: actions/checkout@v6

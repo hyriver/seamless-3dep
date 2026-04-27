@@ -11,7 +11,7 @@ description = "Easy retrieval of seamless DEM from 3DEP across US."
 readme = "README.md"
 license = { text = "MIT" }
 authors = [ { name = "Taher Chegini", email = "cheginit@gmail.com" } ]
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 classifiers = [
   "Development Status :: 4 - Beta",
   "Intended Audience :: Science/Research",
@@ -19,8 +19,6 @@ classifiers = [
   "Operating System :: OS Independent",
   "Programming Language :: Python",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
@@ -32,9 +30,9 @@ dynamic = [
   "version",
 ]
 dependencies = [
-  "numpy",
-  "rasterio",
-  "tiny-retriever>=0.1.1",
+  "numpy>=2",
+  "rasterio>=1.5",
+  "tiny-retriever>=0.3",
 ]
 optional-dependencies.dev = [
   "geopandas>=1",
@@ -93,14 +91,14 @@ version.source = "vcs"
 
 [tool.pixi.environments]
 dev = { features = [ "dev", "py314" ] }
-test310 = { features = [ "test", "py310" ] }
+test312 = { features = [ "test", "py312" ] }
 test314 = { features = [ "test", "py314" ] }
 typecheck = { features = [ "typecheck", "py314" ] }
 lint = { features = [ "lint", "py314" ], no-default-feature = true }
 docs = { features = [ "docs", "py314" ] }
 
 [tool.pixi.feature.dev.dependencies]
-libgdal-core = "*"
+libgdal-core = ">=3.10"
 
 [tool.pixi.feature.dev.tasks]
 # Sync all percent-format .py scripts → paired .ipynb files
@@ -125,14 +123,14 @@ lint = "pre-commit run --all-files"
 pcupdate = "pre-commit autoupdate"
 spell = "codespell -w"
 
-[tool.pixi.feature.py310.dependencies]
-python = "~=3.10.0"
+[tool.pixi.feature.py312.dependencies]
+python = "~=3.12.0"
 
 [tool.pixi.feature.py314.dependencies]
 python = "~=3.14.0"
 
 [tool.pixi.feature.test.dependencies]
-libgdal-core = "*"
+libgdal-core = ">=3.10"
 
 [tool.pixi.feature.test.tasks]
 test = "pytest -m 'not network'"
@@ -152,7 +150,7 @@ channels = [ "conda-forge" ]
 platforms = [ "linux-64", "osx-64", "osx-arm64", "win-64" ]
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py312"
 line-length = 100
 exclude = [ ".pixi", "__pycache__" ]
 lint.select = [ "ALL" ]
@@ -224,7 +222,7 @@ ignore-words-list = "gage,gages"
 expand_tables = [ "tool.git-cliff", "tool.pixi" ]
 
 [tool.pyright]
-pythonVersion = "3.11"
+pythonVersion = "3.12"
 include = [ "src" ]
 ignore = [
   "docs/examples/*.py",

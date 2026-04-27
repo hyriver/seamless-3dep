@@ -6,7 +6,6 @@ import contextlib
 import hashlib
 import math
 import os
-import queue
 import shutil
 import subprocess
 import time
@@ -293,52 +292,34 @@ def _clip_with_src(
 
 
 def _clip_with_retry(
-    pool: queue.Queue[DatasetReader],
-    vrt_url: str,
+    src: DatasetReader,
     box: tuple[float, float, float, float],
     path: Path,
     transform: Affine,
     nodata: float,
 ) -> None:
-    """Clip one tile, replacing the source reader on transient I/O failure.
+    """Clip one tile, retrying with backoff on transient I/O errors.
 
-    Borrows a reader from ``pool``. On a successful clip the reader is
-    returned for reuse; on a transient error the reader is closed (it may
-    be in a bad state — TLS reset, half-read range request, etc.) and a
-    fresh one is opened to keep the pool full so other workers can make
-    progress. Up to ``_RETRY_ATTEMPTS`` attempts with exponential backoff.
+    Reads through a shared thread-safe ``DatasetReader``. GDAL's internal
+    locking serialises individual reads on the dataset object, so a
+    transient network blip on one read leaves the dataset usable for
+    subsequent reads — no replacement needed. Up to ``_RETRY_ATTEMPTS``
+    attempts with exponential backoff.
     """
     delay = _RETRY_BASE_DELAY
     last_error: BaseException | None = None
     for attempt in range(_RETRY_ATTEMPTS):
-        src = pool.get()
         try:
             _clip_with_src(src, box, path, transform, nodata)
         except _RETRY_EXCEPTIONS as exc:
             last_error = exc
-            with contextlib.suppress(Exception):
-                src.close()
-            with contextlib.suppress(Exception):
-                pool.put(rasterio.open(vrt_url))
             if attempt < _RETRY_ATTEMPTS - 1:
                 time.sleep(delay)
                 delay *= _RETRY_BACKOFF
         else:
-            pool.put(src)
             return
     if last_error is not None:
         raise last_error
-
-
-def _drain_pool(pool: queue.Queue[DatasetReader]) -> None:
-    """Close every reader still sitting in the pool (best-effort)."""
-    while True:
-        try:
-            reader = pool.get_nowait()
-        except queue.Empty:
-            return
-        with contextlib.suppress(Exception):
-            reader.close()
 
 
 def _run_clip_pool(
@@ -350,33 +331,31 @@ def _run_clip_pool(
 ) -> None:
     """Clip a batch of sub-bboxes from ``vrt_url`` concurrently.
 
-    Reuses ``DatasetReader`` instances across tiles via a queue so the HTTPS
-    handshake and initial header read are amortized across the full batch.
-    Per-tile failures are collected and raised together as a single
-    :class:`Get3DEPErrors`, so a flaky network for one tile doesn't sink
-    the whole batch.
+    Opens a single thread-safe ``DatasetReader`` (rasterio 1.5+, GDAL 3.10+)
+    and shares it across all workers — GDAL itself serialises individual
+    reads, so we incur the HTTPS handshake and initial header read exactly
+    once per batch instead of once per worker. Per-tile failures are
+    collected and raised together as a single :class:`Get3DEPErrors`, so a
+    flaky network for one tile doesn't sink the whole batch.
     """
     if not todo:
         return
     n_workers = max(1, min(max_workers, len(todo)))
-    pool: queue.Queue[DatasetReader] = queue.Queue()
-    for _ in range(n_workers):
-        pool.put(rasterio.open(vrt_url))
 
     errors: list[BaseException] = []
-    try:
-        with ThreadPoolExecutor(max_workers=n_workers) as executor:
-            futures = [
-                executor.submit(_clip_with_retry, pool, vrt_url, box, path, transform, nodata)
-                for box, path in todo
-            ]
-            for future in as_completed(futures):
-                try:
-                    future.result()
-                except Exception as exc:  # noqa: BLE001, PERF203
-                    errors.append(exc)
-    finally:
-        _drain_pool(pool)
+    with (
+        rasterio.open(vrt_url, thread_safe=True) as src,
+        ThreadPoolExecutor(max_workers=n_workers) as executor,
+    ):
+        futures = [
+            executor.submit(_clip_with_retry, src, box, path, transform, nodata)
+            for box, path in todo
+        ]
+        for future in as_completed(futures):
+            try:
+                future.result()
+            except Exception as exc:  # noqa: BLE001
+                errors.append(exc)
 
     if errors:
         raise Get3DEPErrors(errors, vrt_url)

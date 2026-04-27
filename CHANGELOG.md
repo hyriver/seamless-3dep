@@ -7,6 +7,17 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [0.5.0] - 2026-04-19
 
+### Breaking
+
+- Bump minimum Python to **3.12** (was 3.10) and minimum rasterio to **1.5** (was 1.4).
+    The 3.10 / 3.11 test environments are removed from the matrix. These bumps unlock
+    GDAL's thread-safe mode and let us drop ~50 lines of custom connection-pool plumbing
+    — see the *Changed* section below.
+- Pin `libgdal-core>=3.10` (the minimum that supports
+    `rasterio.open(thread_safe=True)`).
+- Bump minimum numpy to **2** (was unpinned, transitively required by rasterio 1.5) and
+    `tiny-retriever` to **>=0.3**.
+
 ### Fixed
 
 - Snap the read window in `_clip_3dep` to integer pixel boundaries before writing each
@@ -47,16 +58,17 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
-- Pool source `DatasetReader` instances across tiles in `get_dem`. Each worker borrows a
-    reader from a queue, runs one clip, and returns it on success — so the HTTPS
-    handshake and initial range read against the source COG-VRT happen once per worker
-    instead of once per tile. For 50–100-tile requests this is the dominant cost, and
-    the change typically yields a 3–10× speedup over the previous "open per tile"
-    behavior.
+- Open the source COG-VRT once per `get_dem` batch with
+    `rasterio.open(..., thread_safe=True)` (rasterio 1.5+) and share that single
+    `DatasetReader` across all worker threads. GDAL serialises individual reads on the
+    dataset object internally, so we incur the HTTPS handshake and initial header read
+    exactly once per batch instead of once per tile. For 50–100-tile requests this is
+    the dominant cost, and the change typically yields a 3–10× speedup over the previous
+    "open per tile" behavior.
 - Add per-tile retry with exponential backoff (3 attempts, base 0.5 s, 3× backoff) on
-    transient I/O errors (`RasterioIOError` / `OSError`) inside `get_dem`. A poisoned
-    reader is closed and replaced with a fresh one so other workers keep making
-    progress.
+    transient I/O errors (`RasterioIOError` / `OSError`) inside `get_dem`. Because the
+    shared reader is thread-safe, a transient failure on one read leaves it usable for
+    subsequent reads — no reader replacement needed.
 - `get_dem` now collects per-tile failures and raises them together as a single
     `Get3DEPErrors` rather than aborting the whole batch on the first failure.
     Already-completed tiles stay on disk so a re-run resumes from the failed ones.

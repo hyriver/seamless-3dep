@@ -206,7 +206,7 @@ Ready to contribute? Here's how to set up Seamless3DEP for local development.
     ```console
     pixi r lint
     pixi r typecheck
-    pixi r -e test310 test
+    pixi r -e test312 test
     pixi r -e test314 test
     ```
 
