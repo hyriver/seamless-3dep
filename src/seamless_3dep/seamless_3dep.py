@@ -337,6 +337,15 @@ def _run_clip_pool(
     once per batch instead of once per worker. Per-tile failures are
     collected and raised together as a single :class:`Get3DEPErrors`, so a
     flaky network for one tile doesn't sink the whole batch.
+
+    Two GDAL HTTP knobs are set for the duration of the batch:
+
+    - ``GDAL_HTTP_MAX_CACHED_CONNECTIONS`` is bumped from libcurl's
+      default of 5 to ``n_workers`` so concurrent range reads don't
+      contend on a too-small connection pool.
+    - ``GDAL_HTTP_MULTIPLEX=YES`` enables HTTP/2 multiplexing, which AWS
+      S3 supports and which lets concurrent range reads share one TLS
+      connection rather than opening fresh sockets.
     """
     if not todo:
         return
@@ -344,6 +353,10 @@ def _run_clip_pool(
 
     errors: list[BaseException] = []
     with (
+        rasterio.Env(
+            GDAL_HTTP_MAX_CACHED_CONNECTIONS=str(n_workers),
+            GDAL_HTTP_MULTIPLEX="YES",
+        ),
         rasterio.open(vrt_url, thread_safe=True) as src,
         ThreadPoolExecutor(max_workers=n_workers) as executor,
     ):
