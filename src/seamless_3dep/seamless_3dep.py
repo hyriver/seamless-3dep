@@ -124,7 +124,14 @@ def _check_bbox(bbox: Any) -> tuple[float, float, float, float]:
     if not (isinstance(bbox, Sequence) and len(bbox) == 4 and all(map(math.isfinite, bbox))):
         msg = "`bbox` must be a tuple of form (west, south, east, north) in decimal degrees."
         raise TypeError(msg)
-    return (bbox[0], bbox[1], bbox[2], bbox[3])
+    west, south, east, north = bbox[0], bbox[1], bbox[2], bbox[3]
+    if west >= east or south >= north:
+        msg = (
+            "`bbox` must be ordered (west, south, east, north) with west < east "
+            f"and south < north, got ({west}, {south}, {east}, {north})."
+        )
+        raise ValueError(msg)
+    return (west, south, east, north)
 
 
 def _check_bounds(
@@ -170,6 +177,10 @@ def decompose_bbox(
         is not decomposed.
     buff_npixels : int, optional
         Number of pixels to buffer each sub-bbox by, defaults to 0.
+        Only applied when the bbox is decomposed into multiple sub-bboxes;
+        a bbox that fits within ``pixel_max`` is returned as a single
+        un-buffered box (the buffer exists to give per-tile workflows a
+        halo at internal seams, which is moot when there is only one tile).
 
     Returns
     -------
@@ -787,6 +798,7 @@ def _sample_window(
 def elevation_bygrid(
     longs: ArrayLike,
     lats: ArrayLike,
+    res: Literal[10, 30, 60] = 10,
     window: int = 5,
     resampling: int = 1,
 ) -> NDArray[np.floating]:
@@ -794,7 +806,7 @@ def elevation_bygrid(
 
     Notes
     -----
-    Reads directly from the USGS 10 m seamless DEM VRT
+    Reads directly from the USGS seamless DEM VRT
     (Cloud-Optimized GeoTIFFs, EPSG:4269). A small pixel window
     around each query point is read and downsampled to a single
     value using the chosen resampling kernel.
@@ -805,6 +817,10 @@ def elevation_bygrid(
         1D sequence of longitude values in decimal degrees.
     lats : array-like
         1D sequence of latitude values in decimal degrees.
+    res : {10, 30, 60}, optional
+        Source DEM resolution in meters, by default 10. Choose a
+        coarser source if you don't need the 10 m fidelity — coarser
+        VRTs are smaller and faster to range-read.
     window : int, optional
         Size of the read window for interpolation, must be odd,
         defaults to 5.
@@ -825,6 +841,9 @@ def elevation_bygrid(
         2D array of shape ``(len(lats), len(longs))`` with elevation
         values in meters.
     """
+    if res not in VRTLinks:
+        msg = "`res` must be one of 10, 30, or 60 meters."
+        raise ValueError(msg)
     if window % 2 == 0:
         msg = "`window` must be an odd integer."
         raise ValueError(msg)
@@ -833,7 +852,7 @@ def elevation_bygrid(
     lats_arr = np.asarray(lats, dtype=np.float64)
 
     # Pad bbox so edge query points have enough surrounding pixels
-    vrt_info = VRTPool.get_vrt_info(10)
+    vrt_info = VRTPool.get_vrt_info(res)
     pad = abs(vrt_info.transform.a) * (window // 2 + 1)
     _check_bounds(
         (
@@ -846,7 +865,7 @@ def elevation_bygrid(
     )
     nx, ny = len(longs_arr), len(lats_arr)
 
-    with rasterio.open(VRTLinks[10]) as src:
+    with rasterio.open(VRTLinks[res]) as src:
         return np.fromiter(
             (
                 v[0]
