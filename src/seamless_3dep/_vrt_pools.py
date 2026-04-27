@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import atexit
+import contextlib
 from dataclasses import dataclass
 from threading import Lock
 from typing import TYPE_CHECKING, ClassVar, Literal
@@ -14,7 +15,7 @@ if TYPE_CHECKING:
     from rasterio.transform import Affine
 
 Resolution = Literal[10, 30, 60]
-VRTLinks = {
+VRTLinks: dict[Resolution, str] = {
     10: "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/13/TIFF/USGS_Seamless_DEM_13.vrt",
     30: "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1/TIFF/USGS_Seamless_DEM_1.vrt",
     60: "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/2/TIFF/USGS_Seamless_DEM_2.vrt",
@@ -31,12 +32,12 @@ class VRTInfo:
 
 
 class VRTPool:
-    _instances: ClassVar[dict[int, DatasetReader]] = {}
-    _info: ClassVar[dict[int, VRTInfo]] = {}
+    _instances: ClassVar[dict[Resolution, DatasetReader]] = {}
+    _info: ClassVar[dict[Resolution, VRTInfo]] = {}
     _lock: ClassVar[Lock] = Lock()
 
     @classmethod
-    def get_dataset_reader(cls, resolution: int) -> DatasetReader:
+    def get_dataset_reader(cls, resolution: Resolution) -> DatasetReader:
         """Retrieve or initialize a DatasetReader for the given resolution."""
         if resolution not in cls._instances:
             with cls._lock:
@@ -55,18 +56,20 @@ class VRTPool:
         return cls._instances[resolution]
 
     @classmethod
-    def get_vrt_info(cls, resolution: int) -> VRTInfo:
+    def get_vrt_info(cls, resolution: Resolution) -> VRTInfo:
         """Retrieve metadata for the given resolution."""
         _ = cls.get_dataset_reader(resolution)
         return cls._info[resolution]
 
     @classmethod
-    def close(cls):
-        """Cleanup the DatasetReaders."""
+    def close(cls) -> None:
+        """Cleanup the DatasetReaders. Best-effort; errors during close are swallowed."""
         with cls._lock:
             for reader in cls._instances.values():
                 if reader:
-                    reader.close()
+                    # Don't let one failed close strand the others.
+                    with contextlib.suppress(Exception):
+                        reader.close()
             cls._instances.clear()
             cls._info.clear()
 

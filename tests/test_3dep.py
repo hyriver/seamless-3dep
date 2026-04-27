@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import itertools
+import math
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -11,7 +12,7 @@ import shapely
 
 import seamless_3dep as s3dep
 from seamless_3dep._vrt_pools import VRTPool
-from seamless_3dep.seamless_3dep import _snap_window
+from seamless_3dep.seamless_3dep import _check_bbox, _check_bounds, _snap_window
 
 
 @pytest.fixture
@@ -76,6 +77,47 @@ def test_decompose_bbox_with_buffer():
         assert has_overlap
 
 
+@pytest.mark.parametrize(
+    "bad_bbox",
+    [
+        "not a sequence",
+        (1, 2, 3),  # too short
+        (1, 2, 3, 4, 5),  # too long
+        (math.nan, 0, 1, 1),  # NaN
+        (0, 0, math.inf, 1),  # inf
+    ],
+)
+def test_check_bbox_rejects_malformed(bad_bbox: object):
+    """`_check_bbox` rejects non-sequences, wrong lengths, and non-finite values."""
+    with pytest.raises(TypeError, match="`bbox` must be"):
+        _check_bbox(bad_bbox)
+
+
+@pytest.mark.parametrize(
+    "bad_bbox",
+    [
+        (1.0, 0.0, 0.0, 1.0),  # west >= east
+        (0.0, 1.0, 1.0, 0.0),  # south >= north
+        (1.0, 1.0, 1.0, 1.0),  # degenerate
+    ],
+)
+def test_check_bbox_rejects_unordered(bad_bbox: tuple[float, float, float, float]):
+    """`_check_bbox` rejects bboxes that are not (W < E, S < N)."""
+    with pytest.raises(ValueError, match="ordered"):
+        _check_bbox(bad_bbox)
+
+
+def test_check_bounds_accepts_inside_and_rejects_outside():
+    """`_check_bounds` accepts bbox fully inside, rejects partially outside."""
+    bounds = (-180.0, -90.0, 180.0, 90.0)
+    _check_bounds((-1.0, -1.0, 1.0, 1.0), bounds)  # inside
+    _check_bounds(bounds, bounds)  # exactly equal — should pass
+    with pytest.raises(ValueError, match="must be within"):
+        _check_bounds((-181.0, -1.0, 1.0, 1.0), bounds)
+    with pytest.raises(ValueError, match="must be within"):
+        _check_bounds((-1.0, -1.0, 1.0, 91.0), bounds)
+
+
 def test_snap_window_aligns_adjacent_tiles():
     """`_snap_window` must give adjacent fractional windows the same shared edge.
 
@@ -96,6 +138,18 @@ def test_snap_window_aligns_adjacent_tiles():
     # And horizontal alignment too
     assert upper_snapped.col_off == lower_snapped.col_off
     assert upper_snapped.width == lower_snapped.width
+
+
+def test_snap_window_handles_negative_offsets():
+    """`_snap_window` must work when the requested bbox extends past the source."""
+    # E.g. a bbox that starts before the VRT's upper-left → negative col_off/row_off.
+    w = rasterio.windows.Window(col_off=-2.4, row_off=-1.6, width=10.7, height=8.3)
+    snapped = _snap_window(w)
+    # Endpoints round consistently: round(-2.4) = -2, round(-2.4 + 10.7) = round(8.3) = 8
+    assert snapped.col_off == -2
+    assert snapped.col_off + snapped.width == round(w.col_off + w.width)
+    assert snapped.row_off == -2
+    assert snapped.row_off + snapped.height == round(w.row_off + w.height)
 
 
 def test_decompose_bbox_invalid_resolution():
@@ -223,6 +277,52 @@ def test_3dep(tmp_path):
     tiff_files = s3dep.get_map("Slope Degrees", bbox, slope_dir, 30, pixel_max=80000)
     with rasterio.open(tiff_files[0]) as src:
         assert src.shape == (371, 147)
+
+
+def test_tiffs_to_da_rejects_non_iterable_and_missing_files():
+    """`tiffs_to_da` reports clear errors before touching the network."""
+    bbox = (-122.0, 37.0, -121.0, 38.0)
+    with pytest.raises(TypeError, match="iterable"):
+        s3dep.tiffs_to_da(123, bbox)
+    with pytest.raises(ValueError, match="No valid"):
+        s3dep.tiffs_to_da([], bbox)
+    with pytest.raises(ValueError, match="No valid"):
+        s3dep.tiffs_to_da([Path("/does/not/exist.tiff")], bbox)
+
+
+def test_get_dem_cache_hit_skips_network(tmp_path, monkeypatch):
+    """If every expected tile already exists, `get_dem` must not touch the network."""
+    bbox = (-122.0, 37.0, -121.99, 37.01)  # tiny enough to be a single tile
+
+    # Pre-create the file with the exact filename `get_dem` will look for.
+    from seamless_3dep.seamless_3dep import MAX_PIXELS
+
+    bbox_list, _, _ = s3dep.decompose_bbox(bbox, 30, MAX_PIXELS)
+    save_dir = tmp_path / "cached"
+    save_dir.mkdir()
+    from seamless_3dep.seamless_3dep import _create_hash
+
+    expected = save_dir / f"dem_{_create_hash(bbox_list[0], 30, 4326)}.tiff"
+    expected.touch()
+
+    # Sabotage `_run_clip_pool` so any attempt to actually fetch raises.
+    def _fail_pool(*args, **kwargs):
+        msg = "Cache-hit path should not invoke _run_clip_pool"
+        raise AssertionError(msg)
+
+    monkeypatch.setattr("seamless_3dep.seamless_3dep._run_clip_pool", _fail_pool)
+    # Stub out VRTPool.get_vrt_info so we don't go to the network for metadata.
+    from seamless_3dep._vrt_pools import VRTInfo
+
+    fake_info = VRTInfo(
+        bounds=(-180.0, -90.0, 180.0, 90.0),
+        transform=rasterio.transform.from_origin(-180.0, 90.0, 1.0, 1.0),
+        nodata=0.0,
+    )
+    monkeypatch.setattr("seamless_3dep.seamless_3dep.VRTPool.get_vrt_info", lambda res: fake_info)
+
+    out = s3dep.get_dem(bbox, save_dir, 30)
+    assert out == [expected]
 
 
 def test_build_vrt_failure():
