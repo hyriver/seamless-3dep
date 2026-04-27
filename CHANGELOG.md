@@ -11,7 +11,7 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 - Snap the read window in `_clip_3dep` to integer pixel boundaries before writing each
     sub-tile. `rasterio.windows.from_bounds` returns a Window with fractional offsets
-    and lengths; with the old code, GDAL's float-to-int coercion when serialising the
+    and lengths; with the old code, GDAL's float-to-int coercion when serializing the
     GeoTIFF could leave each saved tile on a slightly different rounded pixel grid,
     producing the sub-pixel (~half-pixel, ~4 m at 10 m DEM) NoData strip seen at tile
     seams in external mosaics. After the fix, adjacent tiles share an exact pixel grid

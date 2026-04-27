@@ -53,7 +53,7 @@ import seamless_3dep as s3dep
 # Pull the St. Vrain HUC-8 boundary and download buffered DEM tiles in
 # EPSG:3857 via `get_map`. We add a 10-pixel halo around each tile —
 # enough room for local flow routing at the tile interior to see real
-# neighbours on every side.
+# neighbors on every side.
 
 # %%
 url = "https://reference.geoconnex.us/collections/hu08/items/10190005"

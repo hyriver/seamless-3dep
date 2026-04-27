@@ -88,7 +88,7 @@ ds["elevation"] = xr.DataArray(
 )
 
 # %% [markdown]
-# ## Visualise the results
+# ## Visualize the results
 
 # %%
 fig, axes = plt.subplots(1, 3, figsize=(15, 4))
@@ -146,7 +146,7 @@ plt.show()
 # center.
 #
 # To demonstrate, we sample a small 200 m patch at 2 m spacing
-# (100 x 100 points) using bilinear and nearest-neighbour resampling.
+# (100 x 100 points) using bilinear and nearest-neighbor resampling.
 
 # %%
 # ~200 m patch at ~2 m spacing (much finer than the 10 m DEM)

@@ -351,7 +351,7 @@ def _run_clip_pool(
     """Clip a batch of sub-bboxes from ``vrt_url`` concurrently.
 
     Reuses ``DatasetReader`` instances across tiles via a queue so the HTTPS
-    handshake and initial header read are amortised across the full batch.
+    handshake and initial header read are amortized across the full batch.
     Per-tile failures are collected and raised together as a single
     :class:`Get3DEPErrors`, so a flaky network for one tile doesn't sink
     the whole batch.
