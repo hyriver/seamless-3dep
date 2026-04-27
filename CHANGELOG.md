@@ -13,8 +13,9 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     The 3.10 / 3.11 test environments are removed from the matrix. These bumps unlock
     GDAL's thread-safe mode and let us drop ~50 lines of custom connection-pool plumbing
     — see the *Changed* section below.
-- Pin `libgdal-core>=3.10` (the minimum that supports
-    `rasterio.open(thread_safe=True)`).
+- Pin `libgdal-core>=3.12`. The minimum that supports `rasterio.open(thread_safe=True)`
+    is 3.10, but 3.12 is what rasterio 1.5 wheels already ship and is the version that
+    adds `gdalbuildvrt -pixel-function`.
 - Bump minimum numpy to **2** (was unpinned, transitively required by rasterio 1.5) and
     `tiny-retriever` to **>=0.3**.
 
@@ -55,6 +56,13 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Add a new public `Get3DEPErrors` exception class that aggregates per-tile failures
     from a multi-tile `get_dem` call. Exposes `.errors` (list of per-tile exceptions)
     and `.vrt_url` so callers can inspect the failures and decide whether to retry.
+- Expose a `pixel_function` keyword on `build_vrt` and `tiffs_to_da`, forwarded to
+    `gdalbuildvrt -pixel-function` (GDAL 3.12+). Defaults to `None`, which keeps
+    `gdalbuildvrt`'s "last input wins" behaviour for overlapping pixels. Useful when
+    mosaicking per-tile post-processed outputs (e.g., the TWI example) where overlap
+    pixels can differ between tiles — `pixel_function="mean"` or `"first"` makes the
+    merge deterministic. Common values: `"first"`, `"mean"`, `"median"`, `"min"`,
+    `"max"`, `"mode"`.
 
 ### Changed
 
@@ -69,6 +77,11 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     transient I/O errors (`RasterioIOError` / `OSError`) inside `get_dem`. Because the
     shared reader is thread-safe, a transient failure on one read leaves it usable for
     subsequent reads — no reader replacement needed.
+- Tune two GDAL HTTP knobs for the duration of each `get_dem` batch via `rasterio.Env`:
+    `GDAL_HTTP_MAX_CACHED_CONNECTIONS=n_workers` (libcurl's default of 5 was below our
+    default 8 workers, causing connection churn under load) and
+    `GDAL_HTTP_MULTIPLEX=YES` so concurrent range reads can share a single HTTP/2 TLS
+    connection to AWS S3 instead of opening fresh sockets.
 - `get_dem` now collects per-tile failures and raises them together as a single
     `Get3DEPErrors` rather than aborting the whole batch on the first failure.
     Already-completed tiles stay on disk so a re-run resumes from the failed ones.
