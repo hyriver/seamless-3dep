@@ -6,8 +6,10 @@ import contextlib
 import hashlib
 import math
 import os
+import queue
 import shutil
 import subprocess
+import time
 from collections.abc import Generator, Iterable, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from itertools import islice, product
@@ -17,11 +19,11 @@ from urllib.parse import urlencode
 
 import numpy as np
 import rasterio
+import rasterio.errors
 import rasterio.windows
 import tiny_retriever as terry
 from rasterio.enums import MaskFlags, Resampling
 from rasterio.transform import rowcol
-from tiny_retriever.exceptions import ServiceError
 
 from seamless_3dep._vrt_pools import VRTLinks, VRTPool
 
@@ -49,9 +51,48 @@ if TYPE_CHECKING:
     ]
     CRSType = int | str | CRS
 
-__all__ = ["build_vrt", "decompose_bbox", "elevation_bygrid", "get_dem", "get_map", "tiffs_to_da"]
+__all__ = [
+    "Get3DEPErrors",
+    "build_vrt",
+    "decompose_bbox",
+    "elevation_bygrid",
+    "get_dem",
+    "get_map",
+    "tiffs_to_da",
+]
 
 MAX_PIXELS = 8_000_000
+DEFAULT_MAX_WORKERS = 8
+_RETRY_ATTEMPTS = 3
+_RETRY_BASE_DELAY = 0.5
+_RETRY_BACKOFF = 3.0
+_RETRY_EXCEPTIONS = (rasterio.errors.RasterioIOError, OSError)
+
+
+class Get3DEPErrors(Exception):
+    """Raised when one or more tiles fail to download from 3DEP.
+
+    Carries the per-tile failures in :attr:`errors` so callers can inspect
+    each failure and decide whether to retry. Already-downloaded tiles are
+    left on disk, so re-running ``get_dem`` will resume from the failures.
+
+    Attributes
+    ----------
+    errors : list[BaseException]
+        The exceptions raised by individual tile downloads.
+    vrt_url : str
+        The source VRT URL the failed tiles were being read from.
+    """
+
+    def __init__(self, errors: list[BaseException], vrt_url: str) -> None:
+        self.errors = errors
+        self.vrt_url = vrt_url
+        first = errors[0] if errors else None
+        super().__init__(
+            f"{len(errors)} tile(s) failed to download from {vrt_url}; first error: {first!r}"
+        )
+
+
 VALID_MAP_TYPES = (
     "DEM",
     "Hillshade Gray",
@@ -207,34 +248,127 @@ def _snap_window(window: rasterio.windows.Window) -> rasterio.windows.Window:
     )
 
 
-def _clip_3dep(
-    vrt_url: str,
+def _clip_with_src(
+    src: DatasetReader,
     box: tuple[float, float, float, float],
     tiff_path: Path,
     transform: Affine,
     nodata: float,
 ) -> None:
-    """Clip 3DEP to a bbox and save it as a GeoTiff file with NaN as nodata."""
-    if not tiff_path.exists():
-        window = _snap_window(rasterio.windows.from_bounds(*box, transform=transform))
-        with rasterio.open(vrt_url) as src:
-            meta = src.meta.copy()
-            meta.update(
-                {
-                    "driver": "GTiff",
-                    "height": window.height,
-                    "width": window.width,
-                    "transform": rasterio.windows.transform(window, transform),
-                    "nodata": math.nan,
-                }
-            )
-            data = src.read(window=window)
-        # `data == nodata` silently no-ops when nodata is NaN (NaN != NaN); guard
-        # so a future change to the source's nodata sentinel doesn't slip through.
-        if not math.isnan(nodata):
-            data[data == nodata] = math.nan
-        with rasterio.open(tiff_path, "w", **meta) as dst:
-            dst.write(data)
+    """Single-attempt clip using an already-open source ``DatasetReader``.
+
+    Caller is responsible for opening and closing ``src`` and for skipping
+    already-cached tiles. Kept separate from the retry/pool driver so the
+    happy path stays trivially testable.
+    """
+    window = _snap_window(rasterio.windows.from_bounds(*box, transform=transform))
+    meta = src.meta.copy()
+    meta.update(
+        {
+            "driver": "GTiff",
+            "height": window.height,
+            "width": window.width,
+            "transform": rasterio.windows.transform(window, transform),
+            "nodata": math.nan,
+        }
+    )
+    data = src.read(window=window)
+    # `data == nodata` silently no-ops when nodata is NaN (NaN != NaN); guard
+    # so a future change to the source's nodata sentinel doesn't slip through.
+    if not math.isnan(nodata):
+        data[data == nodata] = math.nan
+    with rasterio.open(tiff_path, "w", **meta) as dst:
+        dst.write(data)
+
+
+def _clip_with_retry(
+    pool: queue.Queue[DatasetReader],
+    vrt_url: str,
+    box: tuple[float, float, float, float],
+    path: Path,
+    transform: Affine,
+    nodata: float,
+) -> None:
+    """Clip one tile, replacing the source reader on transient I/O failure.
+
+    Borrows a reader from ``pool``. On a successful clip the reader is
+    returned for reuse; on a transient error the reader is closed (it may
+    be in a bad state — TLS reset, half-read range request, etc.) and a
+    fresh one is opened to keep the pool full so other workers can make
+    progress. Up to ``_RETRY_ATTEMPTS`` attempts with exponential backoff.
+    """
+    delay = _RETRY_BASE_DELAY
+    last_error: BaseException | None = None
+    for attempt in range(_RETRY_ATTEMPTS):
+        src = pool.get()
+        try:
+            _clip_with_src(src, box, path, transform, nodata)
+        except _RETRY_EXCEPTIONS as exc:
+            last_error = exc
+            with contextlib.suppress(Exception):
+                src.close()
+            with contextlib.suppress(Exception):
+                pool.put(rasterio.open(vrt_url))
+            if attempt < _RETRY_ATTEMPTS - 1:
+                time.sleep(delay)
+                delay *= _RETRY_BACKOFF
+        else:
+            pool.put(src)
+            return
+    if last_error is not None:
+        raise last_error
+
+
+def _drain_pool(pool: queue.Queue[DatasetReader]) -> None:
+    """Close every reader still sitting in the pool (best-effort)."""
+    while True:
+        try:
+            reader = pool.get_nowait()
+        except queue.Empty:
+            return
+        with contextlib.suppress(Exception):
+            reader.close()
+
+
+def _run_clip_pool(
+    vrt_url: str,
+    todo: list[tuple[tuple[float, float, float, float], Path]],
+    transform: Affine,
+    nodata: float,
+    max_workers: int,
+) -> None:
+    """Clip a batch of sub-bboxes from ``vrt_url`` concurrently.
+
+    Reuses ``DatasetReader`` instances across tiles via a queue so the HTTPS
+    handshake and initial header read are amortised across the full batch.
+    Per-tile failures are collected and raised together as a single
+    :class:`Get3DEPErrors`, so a flaky network for one tile doesn't sink
+    the whole batch.
+    """
+    if not todo:
+        return
+    n_workers = max(1, min(max_workers, len(todo)))
+    pool: queue.Queue[DatasetReader] = queue.Queue()
+    for _ in range(n_workers):
+        pool.put(rasterio.open(vrt_url))
+
+    errors: list[BaseException] = []
+    try:
+        with ThreadPoolExecutor(max_workers=n_workers) as executor:
+            futures = [
+                executor.submit(_clip_with_retry, pool, vrt_url, box, path, transform, nodata)
+                for box, path in todo
+            ]
+            for future in as_completed(futures):
+                try:
+                    future.result()
+                except Exception as exc:  # noqa: BLE001, PERF203
+                    errors.append(exc)
+    finally:
+        _drain_pool(pool)
+
+    if errors:
+        raise Get3DEPErrors(errors, vrt_url)
 
 
 def _create_hash(box: tuple[float, float, float, float], res: int, crs: int) -> str:
@@ -248,6 +382,7 @@ def get_dem(
     res: Literal[10, 30, 60] = 10,
     pixel_max: int | None = MAX_PIXELS,
     buff_npixels: int = 0,
+    max_workers: int | None = None,
 ) -> list[Path]:
     """Get DEM from 3DEP at 10, 30, or 60 meters resolutions.
 
@@ -273,11 +408,23 @@ def get_dem(
     buff_npixels : int, optional
         Number of pixels to buffer each sub-bbox by when the bbox is decomposed
         into multiple tiles, defaults to 0 (no buffer).
+    max_workers : int, optional
+        Maximum number of concurrent tile downloads. Defaults to ``None`` which
+        uses ``min(8, os.cpu_count(), n_tiles)``. The bottleneck is HTTPS
+        round-trip latency to the source COG-VRT, so values up to ~16 are
+        useful for very large requests; setting this to ``1`` forces serial
+        downloading.
 
     Returns
     -------
     list of pathlib.Path
         list of GeoTiff files containing the DEM clipped to the bounding box.
+
+    Raises
+    ------
+    Get3DEPErrors
+        If one or more tiles fail to download. Already-completed tiles are
+        kept on disk so re-running ``get_dem`` resumes from the failures.
     """
     if res not in VRTLinks:
         msg = "`res` must be one of 10, 30, or 60 meters."
@@ -297,29 +444,15 @@ def get_dem(
     save_dir.mkdir(parents=True, exist_ok=True)
 
     tiff_list = [save_dir / f"dem_{_create_hash(box, res, 4326)}.tiff" for box in bbox_list]
-    if all(tiff.exists() for tiff in tiff_list):
+    todo = [
+        (box, path) for box, path in zip(bbox_list, tiff_list, strict=True) if not path.exists()
+    ]
+    if not todo:
         return tiff_list
 
-    vrt_url = VRTLinks[res]
-    max_workers = min(4, os.cpu_count() or 1, len(bbox_list))
-    if max_workers == 1:
-        for box, path in zip(bbox_list, tiff_list, strict=False):
-            _clip_3dep(vrt_url, box, path, vrt_info.transform, vrt_info.nodata)
-        return tiff_list
-
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_url = {
-            executor.submit(_clip_3dep, vrt_url, box, path, vrt_info.transform, vrt_info.nodata): (
-                box,
-                path,
-            )
-            for box, path in zip(bbox_list, tiff_list, strict=False)
-        }
-        for future in as_completed(future_to_url):
-            try:
-                future.result()
-            except Exception as e:  # noqa: PERF203
-                raise ServiceError(str(e), vrt_url) from e
+    requested = max_workers if max_workers is not None else DEFAULT_MAX_WORKERS
+    n_workers = max(1, min(requested, os.cpu_count() or 1, len(todo)))
+    _run_clip_pool(VRTLinks[res], todo, vrt_info.transform, vrt_info.nodata, n_workers)
     return tiff_list
 
 
