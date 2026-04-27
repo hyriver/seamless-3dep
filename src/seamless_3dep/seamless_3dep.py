@@ -545,7 +545,12 @@ def _path2str(path: Path | str | list[Path] | list[str]) -> str | list[str]:
     return Path(path).resolve().as_posix()
 
 
-def build_vrt(vrt_path: str | Path, tiff_files: list[str] | list[Path]) -> None:
+def build_vrt(
+    vrt_path: str | Path,
+    tiff_files: list[str] | list[Path],
+    *,
+    pixel_function: str | None = None,
+) -> None:
     """Create a VRT from a list of GeoTIFF tiles.
 
     Notes
@@ -564,6 +569,15 @@ def build_vrt(vrt_path: str | Path, tiff_files: list[str] | list[Path]) -> None:
         Path to save the output VRT file.
     tiff_files : list of str or Path
         List of file paths to include in the VRT.
+    pixel_function : str, optional
+        Name of a GDAL VRT pixel function for resolving pixel values where
+        input tiles overlap, defaults to ``None``. When ``None``, the
+        ``gdalbuildvrt`` default ("last input wins") is used. Useful when
+        mosaicking per-tile post-processed outputs (e.g., TWI computed
+        independently on buffered DEM tiles) where overlap pixels can
+        differ between tiles. Common values: ``"first"``, ``"mean"``,
+        ``"median"``, ``"min"``, ``"max"``, ``"mode"``,
+        ``"geometric_mean"``, ``"harmonic_mean"``. Requires GDAL 3.12+.
     """
     if shutil.which("gdalbuildvrt") is None:
         msg = "GDAL (`libgdal-core`) is required to run `build_vrt`."
@@ -576,14 +590,10 @@ def build_vrt(vrt_path: str | Path, tiff_files: list[str] | list[Path]) -> None:
         msg = "No valid files found."
         raise ValueError(msg)
 
-    command = [
-        "gdalbuildvrt",
-        "-r",
-        "nearest",
-        "-overwrite",
-        _path2str(vrt_path),
-        *_path2str(tiff_files),
-    ]
+    command: list[str] = ["gdalbuildvrt", "-r", "nearest", "-overwrite"]
+    if pixel_function is not None:
+        command += ["-pixel-function", pixel_function]
+    command += [_path2str(vrt_path), *_path2str(tiff_files)]
     try:
         subprocess.run(command, check=True, text=True, capture_output=True)  # noqa: S603
     except subprocess.CalledProcessError as e:
@@ -622,7 +632,11 @@ def _to_poly(
 
 
 def tiffs_to_da(
-    tiff_files: list[Path], geometry: Polygon | Sequence[float], crs: CRSType = 4326
+    tiff_files: list[Path],
+    geometry: Polygon | Sequence[float],
+    crs: CRSType = 4326,
+    *,
+    pixel_function: str | None = None,
 ) -> DataArray:
     """Convert a list of tiff files to a vrt file and return a xarray.DataArray.
 
@@ -634,6 +648,12 @@ def tiffs_to_da(
         Polygon or bounding box in the form (west, south, east, north).
     crs : int, str, or CRS, optional
         Coordinate reference system of the input geometry, by default 4326.
+    pixel_function : str, optional
+        VRT pixel function for resolving overlap between tiles, forwarded
+        to :func:`build_vrt`. Defaults to ``None`` (gdalbuildvrt's
+        "last input wins"). Use e.g. ``"mean"`` or ``"first"`` when
+        mosaicking per-tile post-processed outputs whose overlap pixels
+        differ between tiles. Requires GDAL 3.12+.
 
     Returns
     -------
@@ -667,7 +687,7 @@ def tiffs_to_da(
             "\n".join(p.as_posix() for p in sorted_files).encode()
         ).hexdigest()[:16]
         file = sorted_files[0].parent / f"_s3dep_mosaic_{list_hash}.vrt"
-        build_vrt(file, tiff_files)
+        build_vrt(file, tiff_files, pixel_function=pixel_function)
     da = rxr.open_rasterio(file)
     if not isinstance(da, xr.DataArray):
         msg = (

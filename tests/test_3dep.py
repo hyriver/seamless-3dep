@@ -279,6 +279,55 @@ def test_3dep(tmp_path):
         assert src.shape == (371, 147)
 
 
+def test_build_vrt_pixel_function_changes_overlap_resolution(tmp_path):
+    """`pixel_function="min"` (or "max") must change how overlapping pixels resolve.
+
+    Build two tiny GeoTIFFs that overlap in one row of pixels but disagree on the
+    value there. Default `gdalbuildvrt` is "last input wins"; with
+    `pixel_function="min"`/"max" the overlap row collapses to the per-pixel
+    extremum. Verifying both directions gives confidence the flag is actually
+    being plumbed through to the gdalbuildvrt CLI.
+    """
+    rasterio_transform = pytest.importorskip("rasterio.transform")
+
+    transform = rasterio_transform.from_origin(0.0, 10.0, 1.0, 1.0)
+    profile = {
+        "driver": "GTiff",
+        "dtype": "float32",
+        "width": 4,
+        "height": 4,
+        "count": 1,
+        "transform": transform,
+        "crs": "EPSG:4326",
+    }
+
+    # Top tile covers rows 0-3 of pixel-space (y in [10, 6]) with value 10.0.
+    top = tmp_path / "top.tiff"
+    with rasterio.open(top, "w", **profile) as dst:
+        dst.write(np.full((4, 4), 10.0, dtype="float32"), 1)
+
+    # Bottom tile covers rows 3-6 (y in [7, 3]) with value 20.0; overlaps the
+    # top tile on row 3.
+    bottom = tmp_path / "bottom.tiff"
+    bottom_profile = {**profile, "transform": rasterio_transform.from_origin(0.0, 7.0, 1.0, 1.0)}
+    with rasterio.open(bottom, "w", **bottom_profile) as dst:
+        dst.write(np.full((4, 4), 20.0, dtype="float32"), 1)
+
+    for fn, expected_overlap in [("min", 10.0), ("max", 20.0)]:
+        vrt = tmp_path / f"{fn}.vrt"
+        s3dep.build_vrt(vrt, [top, bottom], pixel_function=fn)
+        with rasterio.open(vrt) as src:
+            data = src.read(1)
+        # The overlap row (y in [7, 6]) should be the chosen extremum.
+        # Find the row whose y-band straddles the overlap by inspecting bounds.
+        y_top = src.bounds.top
+        overlap_row = round(y_top - 7.0)  # one row of overlap at y=7
+        assert data[overlap_row].tolist() == [expected_overlap] * 4, (
+            f"pixel_function={fn!r}: overlap row was {data[overlap_row].tolist()!r}, "
+            f"expected {expected_overlap}"
+        )
+
+
 def test_tiffs_to_da_rejects_non_iterable_and_missing_files():
     """`tiffs_to_da` reports clear errors before touching the network."""
     bbox = (-122.0, 37.0, -121.0, 38.0)
