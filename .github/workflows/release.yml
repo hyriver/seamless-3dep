@@ -39,35 +39,17 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  build-package:
-    name: Build and Inspect Python Package
+  build-publish:
+    name: Build and publish Python Package
     runs-on: ubuntu-latest
-    needs: release-notes
     steps:
-    - uses: actions/checkout@v6
-      with:
-        fetch-depth: 0
-
-    - uses: hynek/build-and-inspect-python-package@v2
-      with:
-        attest-build-provenance-github: true
-
-  release-pypi:
-    name: Publish to PyPI
-    runs-on: ubuntu-latest
-    needs: build-package
-
-    steps:
-    - name: Download packages built by build-and-inspect-python-package
-      uses: actions/download-artifact@v8
-      with:
-        name: Packages
-        path: dist
-
-    - name: Generate artifact attestation for sdist and wheel
-      uses: actions/attest-build-provenance@v4
-      with:
-        subject-path: dist
-
-    - name: Upload package to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
+    - name: Checkout
+      uses: actions/checkout@v6
+    - name: Install uv
+      uses: astral-sh/setup-uv@v8.1.0
+    - name: Install Python 3.14
+      run: uv python install 3.14
+    - name: Build
+      run: uv build
+    - name: Publish
+      run: uv publish
