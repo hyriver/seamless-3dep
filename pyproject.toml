@@ -101,7 +101,7 @@ docs = { features = [ "docs", "py314" ] }
 libgdal-core = ">=3.12"
 
 [tool.pixi.feature.dev.tasks]
-# Sync all percent-format .py scripts → paired .ipynb files
+# Sync all percent-format .py scripts → paired .ipynb files, then trust them
 nb-sync = "jupytext --sync docs/examples/*.py"
 # Execute all notebooks in-place (requires .ipynb to exist; run nb-sync first)
 nb-execute = "jupyter nbconvert --to notebook --execute --inplace docs/examples/*.ipynb"
@@ -157,7 +157,6 @@ lint.select = [ "ALL" ]
 # Adopted from https://github.com/python-attrs/attrs/blob/main/pyproject.toml
 lint.ignore = [
   "ANN",     # pyright is better at this
-  "ARG",     # unused arguments are normal when implementing interfaces
   "B905",    # zip without strict is fine
   "COM",     # ruff format takes care of our commas
   "D",       # we prefer our own docstring style
@@ -177,14 +176,26 @@ lint.per-file-ignores."docs/*.py" = [
   "A001",   # shadowing builtins like `license` is fine for file paths
   "INP001", # no need for init files in docs
 ]
-lint.per-file-ignores."docs/examples/*.{py,ipynb}" = [
+lint.per-file-ignores."docs/examples/*.ipynb" = [
   # notebook-generated files
   "B018",
   "D100",
+  # Module level imports
+  "E402",
+  # we have commented-out code in notebook headers
+  "ERA001",
+]
+lint.per-file-ignores."docs/examples/*.py" = [
+  # notebook-generated files
+  "B018",
+  "D100",
+  # Module level imports
+  "E402",
   # we have commented-out code in notebook headers
   "ERA001",
 ]
 lint.per-file-ignores."tests/*.py" = [
+  "ARG",     # we don't care about unused test function arguments
   "B015",    # pointless comparison in tests aren't pointless
   "B017",    # pytest.raises(Exception) is fine
   "B018",    # pointless expressions in tests aren't pointless
