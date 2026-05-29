@@ -15,7 +15,10 @@ Seamless3DEP is a lightweight Python package that simplifies access to topograph
 from the USGS
 [3D Elevation Program (3DEP)](https://www.usgs.gov/core-science-systems/ngp/3dep).
 Whether you need elevation data or its derivatives, Seamless3DEP provides an efficient
-interface to both static and dynamic 3DEP products.
+interface to both static and dynamic 3DEP products. For global coverage or
+bathymetry-inclusive workflows, Seamless3DEP also exposes the
+[NOAA global DEM mosaic](https://gis.ngdc.noaa.gov/arcgis/rest/services/DEM_mosaics/DEM_global_mosaic/ImageServer)
+and a generic helper for any ArcGIS `ImageServer/exportImage` endpoint.
 
 Seamless3DEP utilizes connection pooling across threads (safely) to optimize service
 calls and minimize redundant connections. This reduces both the service load and the
@@ -50,7 +53,7 @@ topographic data requests.
 
 ## Core Functions
 
-Seamless3DEP offers six main functions designed for efficient data retrieval and
+Seamless3DEP offers eight main functions designed for efficient data retrieval and
 processing:
 
 - `get_dem`: Retrieves static DEMs within a specified bounding box. The function
@@ -58,10 +61,19 @@ processing:
     files in EPSG:4326, and supports resolutions of 10m, 30m, or 60m. A `buff_npixels`
     option produces overlapping tiles to avoid NoData strips along seams when mosaicking
     with `tiffs_to_da`.
-- `get_map`: Fetches any 3DEP product (including DEMs) with customizable parameters.
-    Works with all available product types, allows custom resolution settings, and
-    downloads in EPSG:3857. Due to service limitations, the output projection is not
-    configurable. Also accepts `buff_npixels` for overlapping tiles.
+- `get_map`: Fetches any 3DEP product (including DEMs and terrain derivatives) for areas
+    within the US. Works with all available product types, allows custom resolution
+    settings, and downloads in EPSG:3857. Also accepts `buff_npixels` for overlapping
+    tiles.
+- `get_global_dem`: Fetches the NOAA global DEM mosaic (SRTM + GEBCO + ICESat) for any
+    bounding box on Earth. Returns GeoTIFFs in EPSG:3857. Unlike 3DEP, it includes
+    sub-zero bathymetric values (down to roughly -9982 m), making it the right choice
+    outside the US or for coastal and marine workflows. Native resolution is
+    approximately 30 m (1 arc-second).
+- `get_image_server`: General-purpose downloader for any ArcGIS
+    `ImageServer/exportImage` endpoint. Accepts any output CRS, an optional Esri
+    rendering rule, and handles URL validation, bbox tiling, and resume-on-failure
+    automatically. `get_map` and `get_global_dem` are thin wrappers over this function.
 - `elevation_bygrid`: Samples elevation values from the 10 m seamless DEM at a grid of
     longitude/latitude coordinates. Reads directly from the USGS Cloud-Optimized
     GeoTIFFs (EPSG:4269) and supports configurable resampling methods including nearest,
@@ -75,16 +87,17 @@ processing:
     `seamless-3dep` is installed from PyPI. However, it is installed as a dependency
     when `seamless-3dep` is installed from `conda-forge`.
 - `tiffs_to_da`: Converts a list of GeoTIFF files to an `xarray.DataArray` object. This
-    function is useful for combining multiple GeoTIFF files that `get_map` and `get_dem`
-    produce into a single `xarray.DataArray` object for further analysis. Note that for
-    using this function, `shapely` and `rioxarray` need to be installed.
+    function is useful for combining multiple GeoTIFF files that `get_map`, `get_dem`,
+    and `get_global_dem` produce into a single `xarray.DataArray` for further analysis.
+    Note that `shapely` and `rioxarray` need to be installed to use this function.
 
 ## Important Notes
 
 - Bounding box coordinates should be in decimal degrees (WGS84) format: (west, south,
     east, north)
 - Default projection for requesting maps is EPSG:3857
-- EPSG:4326 output projection is not supported in `get_map` due to service limitations
+- `get_map` is restricted to US coverage; use `get_global_dem` or `get_image_server` for
+    data outside the US
 
 ## Installation
 

@@ -106,6 +106,7 @@ nav:
   - DEM Processing: examples/dem.ipynb
   - Elevation Grid: examples/elevation.ipynb
   - Parallel TWI on Buffered Tiles: examples/twi.ipynb
+  - 3DEP vs NOAA Global DEM: examples/global_dem.ipynb
 - API Reference: reference.md
 - Release Notes: CHANGELOG.md
 - Contributing: CONTRIBUTING.md

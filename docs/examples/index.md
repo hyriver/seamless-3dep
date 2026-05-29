@@ -20,4 +20,7 @@ This will create a new environment called `3dep` with all the required packages.
 - [![Parallel TWI](images/twi.png){ loading=lazy }](twi.ipynb "Parallel TWI on Buffered Tiles")
     **Parallel TWI on Buffered Tiles**
 
+- [![3DEP vs NOAA Global DEM](images/dem_comparison.png){ loading=lazy }](global_dem.ipynb "3DEP vs NOAA Global DEM")
+    **3DEP vs NOAA Global DEM**
+
 </div>

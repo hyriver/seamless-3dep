@@ -8,7 +8,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.19.1
+#       jupytext_version: 1.19.3
 #   kernelspec:
 #     display_name: dev
 #     language: python
@@ -41,23 +41,48 @@ geom = vrain.to_crs(3857).buffer(5e3).to_crs(4326).union_all()
 
 # %%
 data_dir = Path("data")
-tiff_files = s3dep.get_map("DEM", geom.bounds, data_dir, 10)
+dem_tiffs = s3dep.get_map("DEM", geom.bounds, data_dir, 10)
 
 # %% [markdown]
-# We then use `build_vrt` to build a VRT file from the obtained GeoTIFF files so we can use `rioxarray` to read the data into an `xarray.DataArray`.
+# We then use `tiffs_to_da` to read the data into an `xarray.DataArray` and plot it.
 
 # %%
-dem = s3dep.tiffs_to_da(tiff_files, geom_org.bounds, crs=4326)
+dem = s3dep.tiffs_to_da(dem_tiffs, geom_org.bounds, crs=4326)
 
 # %%
 ax = dem.plot.imshow(robust=True)
 ax.figure.savefig("images/dem.png")
 
 # %% [markdown]
-# We can directly get slope using `get_map` function and passing `map_type="Slope Degrees"`.
+# Next, we use [PyWBT](https://pywbt.readthedocs.io) to compute the slope from the retrieved DEM tiles.
 
 # %%
-tiff_files = s3dep.get_map("Slope Degrees", geom.bounds, data_dir, 10)
-slope = s3dep.tiffs_to_da(tiff_files, geom_org.bounds, crs=4326)
+import shutil
+from tempfile import TemporaryDirectory
+
+import pywbt
+
+slope_wbt_files = [data_dir / fname.name.replace("dem", "slope") for fname in dem_tiffs]
+for dname, sname in zip(dem_tiffs, slope_wbt_files):
+    with TemporaryDirectory(dir=data_dir) as temp:
+        shutil.copy(dname, temp)
+        wbt_args = {
+            "BreachDepressions": [f"-i={dname.name}", "--fill_pits", "-o=dem_corr.tiff"],
+            "Slope": ["-i=dem_corr.tiff", "--units=degrees", f"-o={sname.name}"],
+        }
+        pywbt.whitebox_tools(temp, wbt_args, [sname.name], temp)
+        shutil.copy(Path(temp) / sname.name, data_dir)
+
+# %%
+slope = s3dep.tiffs_to_da(slope_wbt_files, geom_org.bounds, crs=4326)
+ax = slope.plot.imshow(robust=True)
+ax.figure.savefig("images/slope_wbt.png")
+
+# %% [markdown]
+# We can also directly get slope using `get_map` function and passing `map_type="Slope Degrees"`.
+
+# %%
+slope_tiffs = s3dep.get_map("Slope Degrees", geom.bounds, data_dir, 10)
+slope = s3dep.tiffs_to_da(slope_tiffs, geom_org.bounds, crs=4326)
 ax = slope.plot.imshow(robust=True)
 ax.figure.savefig("images/slope_dynamic.png")
