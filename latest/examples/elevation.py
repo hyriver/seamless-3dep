@@ -1,11 +1,14 @@
 # ---
 # jupyter:
 #   jupytext:
+#     cell_metadata_filter: -all
+#     formats: ipynb,py:percent
+#     notebook_metadata_filter: kernelspec,jupytext
 #     text_representation:
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: '1.16.0'
+#       jupytext_version: 1.19.3
 #   kernelspec:
 #     display_name: dev
 #     language: python
@@ -85,7 +88,7 @@ ds["elevation"] = xr.DataArray(
 )
 
 # %% [markdown]
-# ## Visualise the results
+# ## Visualize the results
 
 # %%
 fig, axes = plt.subplots(1, 3, figsize=(15, 4))
@@ -143,7 +146,7 @@ plt.show()
 # center.
 #
 # To demonstrate, we sample a small 200 m patch at 2 m spacing
-# (100 x 100 points) using bilinear and nearest-neighbour resampling.
+# (100 x 100 points) using bilinear and nearest-neighbor resampling.
 
 # %%
 # ~200 m patch at ~2 m spacing (much finer than the 10 m DEM)

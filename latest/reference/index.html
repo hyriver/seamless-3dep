@@ -11,7 +11,7 @@
         <link rel="canonical" href="https://docs.hyriver.io/seamless-3dep/latest/reference/">
       
       
-        <link rel="prev" href="../examples/elevation/">
+        <link rel="prev" href="../examples/global_dem/">
       
       
         <link rel="next" href="../CHANGELOG/">
@@ -20,8 +20,15 @@
         
       
       
-      <link rel="icon" href="../assets/hyriver_logo.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-materialx-10.1.0">
+      
+      
+        
+        
+        
+          <link rel="icon" href="../assets/hyriver_logo.png">
+        
+      
+      <meta name="generator" content="mkdocs-ProperDocs 1.6.7, mkdocs-materialx-10.1.6">
     
     
       
@@ -29,15 +36,16 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.e08026d9.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.9d7f4a96.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.204eaadb.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.a45159b5.min.css">
       
-      
-
+    
+    
 
     
+
     
       
     
@@ -171,8 +179,6 @@
     
     
     
-      
-        
       
       
         <label class="md-header__button md-icon" for="__search">
@@ -451,6 +457,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -563,6 +573,62 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/twi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Parallel TWI Computation on Buffered Tiles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/global_dem/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    3DEP vs NOAA Global DEM
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -644,6 +710,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#seamless_3dep.seamless_3dep.Get3DEPErrors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Get3DEPErrors
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#seamless_3dep.seamless_3dep.decompose_bbox" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -666,10 +743,32 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#seamless_3dep.seamless_3dep.get_image_server" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_image_server
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#seamless_3dep.seamless_3dep.get_map" class="md-nav__link">
     <span class="md-ellipsis">
       
         get_map
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#seamless_3dep.seamless_3dep.get_global_dem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_global_dem
       
     </span>
   </a>
@@ -823,8 +922,6 @@
 
 
                   
-
-
   
     <a href="https://github.com/hyriver/seamless-3dep/edit/main/docs/reference.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
@@ -864,6 +961,79 @@
 
 
 
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="seamless_3dep.seamless_3dep.Get3DEPErrors" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">Get3DEPErrors</span>
+
+
+<a href="#seamless_3dep.seamless_3dep.Get3DEPErrors" class="headerlink" title="Permanent link">#</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">Get3DEPErrors</span><span class="p">(</span><span class="n">errors</span><span class="p">,</span> <span class="n">vrt_url</span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/exceptions.html#Exception">Exception</a></code></p>
+
+
+
+        <p>Raised when one or more tiles fail to download from 3DEP.</p>
+<p>Carries the per-tile failures in :attr:<code>errors</code> so callers can inspect
+each failure and decide whether to retry. Already-downloaded tiles are
+left on disk, so re-running :func:<code>get_map</code> will resume from the failures.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+          <b><code><span title="seamless_3dep.seamless_3dep.Get3DEPErrors.errors">errors</span></code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/library/exceptions.html#BaseException">BaseException</a>]</code>)
+          –
+          <div class="doc-md-description">
+            <p>The exceptions raised by individual tile downloads.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+          <b><code><span title="seamless_3dep.seamless_3dep.Get3DEPErrors.vrt_url">vrt_url</span></code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>)
+          –
+          <div class="doc-md-description">
+            <p>The source VRT URL the failed tiles were being read from.</p>
+          </div>
+        </li>
+    </ul>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
 
 <div class="doc doc-object doc-function">
 
@@ -873,7 +1043,7 @@
 
 
 <a href="#seamless_3dep.seamless_3dep.decompose_bbox" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">decompose_bbox</span><span class="p">(</span><span class="n">bbox</span><span class="p">,</span> <span class="n">res</span><span class="p">,</span> <span class="n">pixel_max</span><span class="p">,</span> <span class="n">buff_npixels</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">decompose_bbox</span><span class="p">(</span><span class="n">bbox</span><span class="p">,</span> <span class="n">res</span><span class="p">,</span> <span class="n">pixel_max</span><span class="p">,</span> <span class="n">buff_npixels</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
@@ -910,12 +1080,16 @@ is not decomposed.</p>
         </li>
         <li class="doc-section-item field-body">
             <b><code>buff_npixels</code></b>
-              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>, default:
-                  <code>0.0</code>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></code>, default:
+                  <code>0</code>
 )
           –
           <div class="doc-md-description">
-            <p>Number of pixels to buffer each sub-bbox by, defaults to 0.</p>
+            <p>Number of pixels to buffer each sub-bbox by, defaults to 0.
+Only applied when the bbox is decomposed into multiple sub-bboxes;
+a bbox that fits within <code>pixel_max</code> is returned as a single
+un-buffered box (the buffer exists to give per-tile workflows a
+halo at internal seams, which is moot when there is only one tile).</p>
           </div>
         </li>
     </ul>
@@ -934,14 +1108,16 @@ is not decomposed.</p>
 <b><code>sub_width</code></b> (              <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></code>
 )          –
           <div class="doc-md-description">
-            <p>Width of each sub-bbox in degrees.</p>
+            <p>Pixel width of each sub-bbox, including buffer pixels on both sides
+when <code>buff_npixels &gt; 0</code>.</p>
           </div>
         </li>
         <li class="doc-section-item field-body">
 <b><code>sub_height</code></b> (              <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></code>
 )          –
           <div class="doc-md-description">
-            <p>Height of each sub-bbox in degrees.</p>
+            <p>Pixel height of each sub-bbox, including buffer pixels on both sides
+when <code>buff_npixels &gt; 0</code>.</p>
           </div>
         </li>
     </ul>
@@ -959,7 +1135,14 @@ is not decomposed.</p>
 
 
 <a href="#seamless_3dep.seamless_3dep.get_dem" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">get_dem</span><span class="p">(</span><span class="n">bbox</span><span class="p">,</span> <span class="n">save_dir</span><span class="p">,</span> <span class="n">res</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">pixel_max</span><span class="o">=</span><span class="n"><span title="seamless_3dep.seamless_3dep.MAX_PIXELS">MAX_PIXELS</span></span><span class="p">)</span>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">get_dem</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">bbox</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">save_dir</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">res</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">pixel_max</span><span class="o">=</span><span class="n"><span title="seamless_3dep.seamless_3dep.MAX_PIXELS">MAX_PIXELS</span></span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">buff_npixels</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">max_workers</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">)</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
@@ -969,7 +1152,7 @@ is not decomposed.</p>
 
 <details class="note" open>
   <summary>Notes</summary>
-  <p>If you need a different resolution, use the <code>get_map</code> function
+  <p>If you need a different resolution, use the :func:<code>get_map</code> function
 with <code>map_type="DEM"</code>.</p>
 </details>
 
@@ -1015,6 +1198,31 @@ is not decomposed and is downloaded as a single file. Values more than
 8 million are not allowed.</p>
           </div>
         </li>
+        <li class="doc-section-item field-body">
+            <b><code>buff_npixels</code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></code>, default:
+                  <code>0</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>Number of pixels to buffer each sub-bbox by when the bbox is decomposed
+into multiple tiles, defaults to 0 (no buffer).</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>max_workers</code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></code>, default:
+                  <code>None</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>Maximum number of concurrent tile downloads. Defaults to <code>None</code> which
+uses <code>min(8, os.cpu_count(), n_tiles)</code>. The bottleneck is HTTPS
+round-trip latency to the source COG-VRT, so values up to ~16 are
+useful for very large requests; setting this to <code>1</code> forces serial
+downloading.</p>
+          </div>
+        </li>
     </ul>
 
 
@@ -1025,6 +1233,154 @@ is not decomposed and is downloaded as a single file. Values more than
           –
           <div class="doc-md-description">
             <p>list of GeoTiff files containing the DEM clipped to the bounding box.</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code><a class="autorefs autorefs-internal" title="Get3DEPErrors (seamless_3dep.seamless_3dep.Get3DEPErrors)" href="#seamless_3dep.seamless_3dep.Get3DEPErrors">Get3DEPErrors</a></code>
+            –
+          <div class="doc-md-description">
+            <p>If one or more tiles fail to download. Already-completed tiles are
+kept on disk so re-running :func:<code>get_map</code> resumes from the failures.</p>
+          </div>
+        </li>
+    </ul>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="seamless_3dep.seamless_3dep.get_image_server" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">get_image_server</span>
+
+
+<a href="#seamless_3dep.seamless_3dep.get_image_server" class="headerlink" title="Permanent link">#</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">get_image_server</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">url</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">bbox</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">save_dir</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">name</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">image_crs</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">res</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">pixel_max</span><span class="o">=</span><span class="n"><span title="seamless_3dep.seamless_3dep.MAX_PIXELS">MAX_PIXELS</span></span><span class="p">,</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">buff_npixels</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">rendering_rule</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Download tiled GeoTiffs from any ArcGIS <code>ImageServer/exportImage</code> endpoint.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+            <b><code>url</code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>)
+          –
+          <div class="doc-md-description">
+            <p>Full URL of an ArcGIS ImageServer <code>exportImage</code> endpoint, e.g.
+<code>https://server/arcgis/rest/services/Layer/ImageServer/exportImage</code>.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>bbox</code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#tuple">tuple</a></code>)
+          –
+          <div class="doc-md-description">
+            <p>Bounding box in decimal degrees (WGS84): (west, south, east, north).</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>save_dir</code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a> or <a class="autorefs autorefs-external" title="pathlib.Path" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path">Path</a></code>)
+          –
+          <div class="doc-md-description">
+            <p>Directory to save the GeoTiff files.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>name</code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>)
+          –
+          <div class="doc-md-description">
+            <p>Prefix used when naming the output files.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>image_crs</code></b>
+              (<code>int, str, or rasterio.crs.CRS</code>)
+          –
+          <div class="doc-md-description">
+            <p>Output image CRS passed as <code>imageSR</code>. Accepts anything
+<code>rasterio.crs.CRS.from_user_input</code> understands (EPSG integer, authority
+string such as <code>"EPSG:3857"</code>, or a CRS object). Resolved to an EPSG
+WKID when one exists, otherwise serialized as a WKT JSON string. Not
+all services support every CRS; check the service capabilities first.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>res</code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></code>)
+          –
+          <div class="doc-md-description">
+            <p>Target resolution in meters.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>pixel_max</code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></code>, default:
+                  <code><span title="seamless_3dep.seamless_3dep.MAX_PIXELS">MAX_PIXELS</span></code>
+)
+          –
+          <div class="doc-md-description">
+            <p>Maximum pixels per tile for bbox decomposition, by default 8 million.
+Pass <code>None</code> to download as a single file. Values above 8 million are
+not allowed.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>buff_npixels</code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></code>, default:
+                  <code>0</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>Pixel buffer around each tile when the bbox is decomposed, by default 0.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>rendering_rule</code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#dict">dict</a></code>, default:
+                  <code>None</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>Esri rendering rule serialized as the <code>renderingRule</code> JSON parameter,
+e.g. <code>{"rasterFunction": "Hillshade Gray"}</code>. <code>None</code> returns raw
+pixel values (elevation/DEM).</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Returns:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code>list of pathlib.Path</code>
+          –
+          <div class="doc-md-description">
+            <p>GeoTiff files covering the bounding box.</p>
           </div>
         </li>
     </ul>
@@ -1043,8 +1399,13 @@ is not decomposed and is downloaded as a single file. Values more than
 
 <a href="#seamless_3dep.seamless_3dep.get_map" class="headerlink" title="Permanent link">#</a></h2>
 <div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">get_map</span><span class="p">(</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">map_type</span><span class="p">,</span> <span class="n">bbox</span><span class="p">,</span> <span class="n">save_dir</span><span class="p">,</span> <span class="n">res</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">pixel_max</span><span class="o">=</span><span class="n"><span title="seamless_3dep.seamless_3dep.MAX_PIXELS">MAX_PIXELS</span></span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">map_type</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">bbox</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">save_dir</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">res</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">pixel_max</span><span class="o">=</span><span class="n"><span title="seamless_3dep.seamless_3dep.MAX_PIXELS">MAX_PIXELS</span></span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">buff_npixels</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">)</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
@@ -1081,7 +1442,7 @@ is not decomposed and is downloaded as a single file. Values more than
               (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#tuple">tuple</a></code>)
           –
           <div class="doc-md-description">
-            <p>Bounding box coordinates in decimal degrees (WG84): (west, south, east, north).</p>
+            <p>Bounding box coordinates in decimal degrees (WGS84): (west, south, east, north).</p>
           </div>
         </li>
         <li class="doc-section-item field-body">
@@ -1115,6 +1476,17 @@ is not decomposed and is downloaded as a single file. Values more than
 8 million are not allowed.</p>
           </div>
         </li>
+        <li class="doc-section-item field-body">
+            <b><code>buff_npixels</code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></code>, default:
+                  <code>0</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>Number of pixels to buffer each sub-bbox by when the bbox is decomposed
+into multiple tiles, defaults to 0 (no buffer).</p>
+          </div>
+        </li>
     </ul>
 
 
@@ -1137,12 +1509,110 @@ is not decomposed and is downloaded as a single file. Values more than
 <div class="doc doc-object doc-function">
 
 
+<h2 id="seamless_3dep.seamless_3dep.get_global_dem" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">get_global_dem</span>
+
+
+<a href="#seamless_3dep.seamless_3dep.get_global_dem" class="headerlink" title="Permanent link">#</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">get_global_dem</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">bbox</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">save_dir</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">res</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">pixel_max</span><span class="o">=</span><span class="n"><span title="seamless_3dep.seamless_3dep.MAX_PIXELS">MAX_PIXELS</span></span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">buff_npixels</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Get the NOAA global DEM mosaic in 3857 coordinate system.</p>
+<p>The NOAA global mosaic blends SRTM, GEBCO, ICESat, and other sources into a
+single seamless worldwide layer. Unlike :func:<code>get_map</code>, it covers the entire
+globe and includes sub-zero bathymetric values (down to roughly -9982 m).
+Native resolution is approximately 1 arc-second (~30 m) over most of the
+world; finer values will upsample from that source.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+            <b><code>bbox</code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#tuple">tuple</a></code>)
+          –
+          <div class="doc-md-description">
+            <p>Bounding box in decimal degrees (WGS84): (west, south, east, north).</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>save_dir</code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a> or <a class="autorefs autorefs-external" title="pathlib.Path" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path">Path</a></code>)
+          –
+          <div class="doc-md-description">
+            <p>Path to save the GeoTiff files.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>res</code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></code>, default:
+                  <code>30</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>Target resolution in meters, by default 30 to match the global mosaic's
+native ~1 arc-second resolution.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>pixel_max</code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></code>, default:
+                  <code><span title="seamless_3dep.seamless_3dep.MAX_PIXELS">MAX_PIXELS</span></code>
+)
+          –
+          <div class="doc-md-description">
+            <p>Maximum pixels per tile for bbox decomposition, by default 8 million.
+Pass <code>None</code> to download as a single file. Values above 8 million are
+not allowed.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>buff_npixels</code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></code>, default:
+                  <code>0</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>Pixel buffer around each tile when the bbox is decomposed, by default 0.</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Returns:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code>list of pathlib.Path</code>
+          –
+          <div class="doc-md-description">
+            <p>GeoTiff files covering the bounding box.</p>
+          </div>
+        </li>
+    </ul>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h2 id="seamless_3dep.seamless_3dep.build_vrt" class="doc doc-heading">
             <span class="doc doc-object-name doc-function-name">build_vrt</span>
 
 
 <a href="#seamless_3dep.seamless_3dep.build_vrt" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">build_vrt</span><span class="p">(</span><span class="n">vrt_path</span><span class="p">,</span> <span class="n">tiff_files</span><span class="p">)</span>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">build_vrt</span><span class="p">(</span><span class="n">vrt_path</span><span class="p">,</span> <span class="n">tiff_files</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">pixel_function</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
@@ -1179,6 +1649,23 @@ as a dependency and this function works without any additional steps.</p>
             <p>List of file paths to include in the VRT.</p>
           </div>
         </li>
+        <li class="doc-section-item field-body">
+            <b><code>pixel_function</code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>, default:
+                  <code>None</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>Name of a GDAL VRT pixel function for resolving pixel values where
+input tiles overlap, defaults to <code>None</code>. When <code>None</code>, the
+<code>gdalbuildvrt</code> default ("last input wins") is used. Useful when
+mosaicking per-tile post-processed outputs (e.g., TWI computed
+independently on buffered DEM tiles) where overlap pixels can
+differ between tiles. Common values: <code>"first"</code>, <code>"mean"</code>,
+<code>"median"</code>, <code>"min"</code>, <code>"max"</code>, <code>"mode"</code>,
+<code>"geometric_mean"</code>, <code>"harmonic_mean"</code>. Requires GDAL 3.12+.</p>
+          </div>
+        </li>
     </ul>
 
 
@@ -1194,7 +1681,9 @@ as a dependency and this function works without any additional steps.</p>
 
 
 <a href="#seamless_3dep.seamless_3dep.tiffs_to_da" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">tiffs_to_da</span><span class="p">(</span><span class="n">tiff_files</span><span class="p">,</span> <span class="n">geometry</span><span class="p">,</span> <span class="n">crs</span><span class="o">=</span><span class="mi">4326</span><span class="p">)</span>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">tiffs_to_da</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">tiff_files</span><span class="p">,</span> <span class="n">geometry</span><span class="p">,</span> <span class="n">crs</span><span class="o">=</span><span class="mi">4326</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">pixel_function</span><span class="o">=</span><span class="kc">None</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
@@ -1230,6 +1719,20 @@ as a dependency and this function works without any additional steps.</p>
             <p>Coordinate reference system of the input geometry, by default 4326.</p>
           </div>
         </li>
+        <li class="doc-section-item field-body">
+            <b><code>pixel_function</code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>, default:
+                  <code>None</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>VRT pixel function for resolving overlap between tiles, forwarded
+to :func:<code>build_vrt</code>. Defaults to <code>None</code> (<code>gdalbuildvrt</code>'s
+"last input wins"). Use e.g. <code>"mean"</code> or <code>"first"</code> when
+mosaicking per-tile post-processed outputs whose overlap pixels
+differ between tiles. Requires GDAL 3.12+.</p>
+          </div>
+        </li>
     </ul>
 
 
@@ -1257,7 +1760,9 @@ as a dependency and this function works without any additional steps.</p>
 
 
 <a href="#seamless_3dep.seamless_3dep.elevation_bygrid" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">elevation_bygrid</span><span class="p">(</span><span class="n">longs</span><span class="p">,</span> <span class="n">lats</span><span class="p">,</span> <span class="n">window</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">resampling</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">elevation_bygrid</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">longs</span><span class="p">,</span> <span class="n">lats</span><span class="p">,</span> <span class="n">res</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">window</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">resampling</span><span class="o">=</span><span class="mi">1</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
@@ -1267,7 +1772,7 @@ as a dependency and this function works without any additional steps.</p>
 
 <details class="note" open>
   <summary>Notes</summary>
-  <p>Reads directly from the USGS 10 m seamless DEM VRT
+  <p>Reads directly from the USGS seamless DEM VRT
 (Cloud-Optimized GeoTIFFs, EPSG:4269). A small pixel window
 around each query point is read and downsampled to a single
 value using the chosen resampling kernel.</p>
@@ -1289,6 +1794,18 @@ value using the chosen resampling kernel.</p>
           –
           <div class="doc-md-description">
             <p>1D sequence of latitude values in decimal degrees.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>res</code></b>
+              (<code>(10, 30, 60)</code>, default:
+                  <code>10</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>Source DEM resolution in meters, by default 10. Choose a
+coarser source if you don't need the 10 m fidelity — coarser
+VRTs are smaller and faster to range-read.</p>
           </div>
         </li>
         <li class="doc-section-item field-body">
@@ -1353,6 +1870,13 @@ values in meters.</p>
 
 
 
+
+
+
+
+
+
+
                 
 
               </article>
@@ -1374,7 +1898,7 @@ values in meters.</p>
       
       
       <label class="md-top__button md-top__side md-top__side--nav" for="__drawer" >
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2m0 14H9V6h11Z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-panel-left" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
       </label>
     
     
@@ -1389,7 +1913,7 @@ values in meters.</p>
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../examples/elevation/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Adding Elevation to a Climate Dataset">
+          <a href="../examples/global_dem/" class="md-footer__link md-footer__link--prev" aria-label="Previous: 3DEP vs NOAA Global DEM">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -1399,7 +1923,7 @@ values in meters.</p>
                 Previous
               </span>
               <div class="md-ellipsis">
-                Adding Elevation to a Climate Dataset
+                3DEP vs NOAA Global DEM
               </div>
             </div>
           </a>
@@ -1431,7 +1955,7 @@ values in meters.</p>
   
     Made with
     <a href="https://jaywhj.github.io/mkdocs-materialx/" target="_blank" rel="noopener">
-      MaterialX for MkDocs
+      MaterialX
     </a>
   
 </div>
@@ -1478,10 +2002,10 @@ values in meters.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["content.tabs.link", "content.code.copy", "content.action.edit", "content.code.annotate", "navigation.sections", "navigation.expand", "navigation.collapse", "navigation.instant", "navigation.instant.progress", "navigation.tracking", "navigation.top", "navigation.footer", "navigation.indexes", "navigation.tabs", "navigation.tabs.sticky", "navigation.path", "search.suggest", "search.highlight", "toc.follow", "toc.integrate"], "search": "../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "code": null, "features": ["content.tabs.link", "content.code.copy", "content.action.edit", "content.code.annotate", "navigation.sections", "navigation.expand", "navigation.collapse", "navigation.instant", "navigation.instant.progress", "navigation.tracking", "navigation.top", "navigation.footer", "navigation.indexes", "navigation.tabs", "navigation.tabs.sticky", "navigation.path", "search.suggest", "search.highlight", "toc.follow", "toc.integrate"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "code.collapse": "Collapse", "code.download": "Download", "code.expand": "Expand remaining # lines", "code.select": "Toggle line selection", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.de0c63e3.min.js"></script>
+      <script src="../assets/javascripts/bundle.4e7371e1.min.js"></script>
       
     
   </body>

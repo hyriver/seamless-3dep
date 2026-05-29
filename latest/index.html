@@ -18,8 +18,15 @@
         
       
       
-      <link rel="icon" href="assets/hyriver_logo.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-materialx-10.1.0">
+      
+      
+        
+        
+        
+          <link rel="icon" href="assets/hyriver_logo.png">
+        
+      
+      <meta name="generator" content="mkdocs-ProperDocs 1.6.7, mkdocs-materialx-10.1.6">
     
     
       
@@ -27,15 +34,16 @@
       
     
     
-      <link rel="stylesheet" href="assets/stylesheets/main.e08026d9.min.css">
+      <link rel="stylesheet" href="assets/stylesheets/main.9d7f4a96.min.css">
       
         
-        <link rel="stylesheet" href="assets/stylesheets/palette.204eaadb.min.css">
+        <link rel="stylesheet" href="assets/stylesheets/palette.a45159b5.min.css">
       
-      
-
+    
+    
 
     
+
     
       
     
@@ -169,8 +177,6 @@
     
     
     
-      
-        
       
       
         <label class="md-header__button md-icon" for="__search">
@@ -646,6 +652,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -745,6 +755,62 @@
     
   
     Adding Elevation to a Climate Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="examples/twi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Parallel TWI Computation on Buffered Tiles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="examples/global_dem/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    3DEP vs NOAA Global DEM
   
 
     
@@ -898,8 +964,6 @@
 
 
                   
-
-
   
     <a href="https://github.com/hyriver/seamless-3dep/edit/main/docs/README.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
@@ -923,7 +987,10 @@
 from the USGS
 <a href="https://www.usgs.gov/core-science-systems/ngp/3dep">3D Elevation Program (3DEP)</a>.
 Whether you need elevation data or its derivatives, Seamless3DEP provides an efficient
-interface to both static and dynamic 3DEP products.</p>
+interface to both static and dynamic 3DEP products. For global coverage or
+bathymetry-inclusive workflows, Seamless3DEP also exposes the
+<a href="https://gis.ngdc.noaa.gov/arcgis/rest/services/DEM_mosaics/DEM_global_mosaic/ImageServer">NOAA global DEM mosaic</a>
+and a generic helper for any ArcGIS <code>ImageServer/exportImage</code> endpoint.</p>
 <p>Seamless3DEP utilizes connection pooling across threads (safely) to optimize service
 calls and minimize redundant connections. This reduces both the service load and the
 time required to retrieve data, making it an ideal tool for handling large-scale
@@ -959,16 +1026,27 @@ topographic data requests.</p>
 </li>
 </ul>
 <h2 id="core-functions">Core Functions<a class="headerlink" href="#core-functions" title="Permanent link">#</a></h2>
-<p>Seamless3DEP offers six main functions designed for efficient data retrieval and
+<p>Seamless3DEP offers eight main functions designed for efficient data retrieval and
 processing:</p>
 <ul>
 <li><code>get_dem</code>: Retrieves static DEMs within a specified bounding box. The function
     automatically splits large areas into manageable tiles, downloads data as GeoTIFF
-    files in EPSG:4326, and supports resolutions of 10m, 30m, or 60m.</li>
-<li><code>get_map</code>: Fetches any 3DEP product (including DEMs) with customizable parameters.
-    Works with all available product types, allows custom resolution settings, and
-    downloads in EPSG:3857. Due to service limitations, the output projection is not
-    configurable.</li>
+    files in EPSG:4326, and supports resolutions of 10m, 30m, or 60m. A <code>buff_npixels</code>
+    option produces overlapping tiles to avoid NoData strips along seams when mosaicking
+    with <code>tiffs_to_da</code>.</li>
+<li><code>get_map</code>: Fetches any 3DEP product (including DEMs and terrain derivatives) for areas
+    within the US. Works with all available product types, allows custom resolution
+    settings, and downloads in EPSG:3857. Also accepts <code>buff_npixels</code> for overlapping
+    tiles.</li>
+<li><code>get_global_dem</code>: Fetches the NOAA global DEM mosaic (SRTM + GEBCO + ICESat) for any
+    bounding box on Earth. Returns GeoTIFFs in EPSG:3857. Unlike 3DEP, it includes
+    sub-zero bathymetric values (down to roughly -9982 m), making it the right choice
+    outside the US or for coastal and marine workflows. Native resolution is
+    approximately 30 m (1 arc-second).</li>
+<li><code>get_image_server</code>: General-purpose downloader for any ArcGIS
+    <code>ImageServer/exportImage</code> endpoint. Accepts any output CRS, an optional Esri
+    rendering rule, and handles URL validation, bbox tiling, and resume-on-failure
+    automatically. <code>get_map</code> and <code>get_global_dem</code> are thin wrappers over this function.</li>
 <li><code>elevation_bygrid</code>: Samples elevation values from the 10 m seamless DEM at a grid of
     longitude/latitude coordinates. Reads directly from the USGS Cloud-Optimized
     GeoTIFFs (EPSG:4269) and supports configurable resampling methods including nearest,
@@ -982,16 +1060,17 @@ processing:</p>
     <code>seamless-3dep</code> is installed from PyPI. However, it is installed as a dependency
     when <code>seamless-3dep</code> is installed from <code>conda-forge</code>.</li>
 <li><code>tiffs_to_da</code>: Converts a list of GeoTIFF files to an <code>xarray.DataArray</code> object. This
-    function is useful for combining multiple GeoTIFF files that <code>get_map</code> and <code>get_dem</code>
-    produce into a single <code>xarray.DataArray</code> object for further analysis. Note that for
-    using this function, <code>shapely</code> and <code>rioxarray</code> need to be installed.</li>
+    function is useful for combining multiple GeoTIFF files that <code>get_map</code>, <code>get_dem</code>,
+    and <code>get_global_dem</code> produce into a single <code>xarray.DataArray</code> for further analysis.
+    Note that <code>shapely</code> and <code>rioxarray</code> need to be installed to use this function.</li>
 </ul>
 <h2 id="important-notes">Important Notes<a class="headerlink" href="#important-notes" title="Permanent link">#</a></h2>
 <ul>
 <li>Bounding box coordinates should be in decimal degrees (WGS84) format: (west, south,
     east, north)</li>
 <li>Default projection for requesting maps is EPSG:3857</li>
-<li>EPSG:4326 output projection is not supported in <code>get_map</code> due to service limitations</li>
+<li><code>get_map</code> is restricted to US coverage; use <code>get_global_dem</code> or <code>get_image_server</code> for
+    data outside the US</li>
 </ul>
 <h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">#</a></h2>
 <p>Choose your preferred installation method:</p>
@@ -1035,6 +1114,13 @@ guidelines and instructions.</p>
 
 
 
+
+
+
+
+
+
+
                 
 
               </article>
@@ -1056,7 +1142,7 @@ guidelines and instructions.</p>
       
       
       <label class="md-top__button md-top__side md-top__side--nav" for="__drawer" >
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2m0 14H9V6h11Z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-panel-left" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
       </label>
     
     
@@ -1097,7 +1183,7 @@ guidelines and instructions.</p>
   
     Made with
     <a href="https://jaywhj.github.io/mkdocs-materialx/" target="_blank" rel="noopener">
-      MaterialX for MkDocs
+      MaterialX
     </a>
   
 </div>
@@ -1144,10 +1230,10 @@ guidelines and instructions.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": ["content.tabs.link", "content.code.copy", "content.action.edit", "content.code.annotate", "navigation.sections", "navigation.expand", "navigation.collapse", "navigation.instant", "navigation.instant.progress", "navigation.tracking", "navigation.top", "navigation.footer", "navigation.indexes", "navigation.tabs", "navigation.tabs.sticky", "navigation.path", "search.suggest", "search.highlight", "toc.follow", "toc.integrate"], "search": "assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": ".", "code": null, "features": ["content.tabs.link", "content.code.copy", "content.action.edit", "content.code.annotate", "navigation.sections", "navigation.expand", "navigation.collapse", "navigation.instant", "navigation.instant.progress", "navigation.tracking", "navigation.top", "navigation.footer", "navigation.indexes", "navigation.tabs", "navigation.tabs.sticky", "navigation.path", "search.suggest", "search.highlight", "toc.follow", "toc.integrate"], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "code.collapse": "Collapse", "code.download": "Download", "code.expand": "Expand remaining # lines", "code.select": "Toggle line selection", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="assets/javascripts/bundle.de0c63e3.min.js"></script>
+      <script src="assets/javascripts/bundle.4e7371e1.min.js"></script>
       
     
   </body>
