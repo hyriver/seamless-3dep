@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.5.1] - 2026-05-29
+
+### Added
+
+- Add `get_image_server` - a general-purpose downloader for any ArcGIS
+    `ImageServer/exportImage` endpoint. Accepts any output CRS (`int`, `str`, or
+    `rasterio.crs.CRS`), an optional Esri rendering rule, and handles URL validation,
+    bbox tiling, and resume-on-failure automatically. `get_map` and `get_global_dem` are
+    thin wrappers over this function.
+- Add `get_global_dem` - a wrapper around the
+    [NOAA global DEM mosaic](https://gis.ngdc.noaa.gov/arcgis/rest/services/DEM_mosaics/DEM_global_mosaic/ImageServer)
+    (SRTM + GEBCO + ICESat) for downloading elevation data anywhere on Earth. Returns
+    GeoTIFFs in EPSG:3857 and includes sub-zero bathymetric values (down to ~-9982 m),
+    making it the right choice outside the US or for coastal/marine workflows. Native
+    resolution is approximately 30 m (1 arc-second); defaults to `res=30`.
+- Add `global_dem.ipynb` example notebook that downloads both 3DEP and NOAA global DEM
+    for the same Oregon coast bounding box, produces a three-panel visual comparison
+    (shared colorscale), elevation distribution histograms, and pixel-level agreement
+    statistics (overall and land-only).
+
+### Changed
+
+- Refactor `get_map` as a thin wrapper over the new `get_image_server`. Behavior and
+    signature are unchanged; the 3DEP URL is now the `_3DEP_URL` module-level constant.
+- Add lazy loading to `__init__.py`: all public names are imported on first access
+    rather than at module import time, reducing cold-start overhead for scripts that
+    only use a subset of the package. Set `EAGER_IMPORT=1` to restore eager loading.
+
+### Fixed
+
+- Include the ImageServer endpoint URL and rendering rule in cache keys so calls with
+    the same bounding box, resolution, name, and CRS cannot reuse stale TIFFs from a
+    different source or raster function.
+- Write clipped `get_dem` tiles through a temporary file before replacing the final
+    cache path so failed writes cannot leave partial TIFFs that look like valid cache
+    hits on a later retry.
+
 ## [0.5.0] - 2026-04-19
 
 ### Breaking
