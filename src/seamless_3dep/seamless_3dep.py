@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import json
 import math
 import os
 import shutil
@@ -14,7 +15,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from itertools import islice, product
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast, overload
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 import numpy as np
 import rasterio
@@ -28,7 +29,7 @@ from seamless_3dep._vrt_pools import VRTLinks, VRTPool
 
 if TYPE_CHECKING:
     from numpy.typing import ArrayLike, NDArray
-    from pyproj import CRS
+    from rasterio.crs import CRS
     from rasterio.io import DatasetReader
     from rasterio.transform import Affine
     from shapely import Polygon
@@ -56,6 +57,8 @@ __all__ = [
     "decompose_bbox",
     "elevation_bygrid",
     "get_dem",
+    "get_global_dem",
+    "get_image_server",
     "get_map",
     "tiffs_to_da",
 ]
@@ -73,7 +76,7 @@ class Get3DEPErrors(Exception):
 
     Carries the per-tile failures in :attr:`errors` so callers can inspect
     each failure and decide whether to retry. Already-downloaded tiles are
-    left on disk, so re-running ``get_dem`` will resume from the failures.
+    left on disk, so re-running :func:`get_map` will resume from the failures.
 
     Attributes
     ----------
@@ -91,6 +94,11 @@ class Get3DEPErrors(Exception):
             f"{len(errors)} tile(s) failed to download from {vrt_url}; first error: {first!r}"
         )
 
+
+_3DEP_URL = (
+    "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage"
+)
+_NOAA_GLOBAL_URL = "https://gis.ngdc.noaa.gov/arcgis/rest/services/DEM_mosaics/DEM_global_mosaic/ImageServer/exportImage"
 
 VALID_MAP_TYPES = (
     "DEM",
@@ -283,6 +291,7 @@ def _clip_with_retry(
         "nodata": math.nan,
     }
     delay = _RETRY_BASE_DELAY
+    temp_path = path.with_name(f".{path.name}.tmp")
     for attempt in range(_RETRY_ATTEMPTS):
         try:
             data = src.read(window=window)
@@ -290,9 +299,12 @@ def _clip_with_retry(
             # guard so a future change to the source sentinel doesn't slip through.
             if not math.isnan(nodata):
                 data[data == nodata] = math.nan
-            with rasterio.open(path, "w", **meta) as dst:
+            with rasterio.open(temp_path, "w", **meta) as dst:
                 dst.write(data)
+            temp_path.replace(path)
         except _RETRY_EXCEPTIONS:
+            with contextlib.suppress(FileNotFoundError):
+                temp_path.unlink()
             if attempt == _RETRY_ATTEMPTS - 1:
                 raise
             time.sleep(delay)
@@ -329,13 +341,9 @@ def _run_clip_pool(
     if not todo:
         return
 
-    http_env = rasterio.Env(
-        GDAL_HTTP_MAX_CACHED_CONNECTIONS=str(n_workers),
-        GDAL_HTTP_MULTIPLEX="YES",
-    )
     errors: list[BaseException] = []
     with (
-        http_env,
+        rasterio.Env(GDAL_HTTP_MAX_CACHED_CONNECTIONS=str(n_workers), GDAL_HTTP_MULTIPLEX="YES"),
         rasterio.open(vrt_url, thread_safe=True) as src,
         ThreadPoolExecutor(max_workers=n_workers) as executor,
     ):
@@ -353,9 +361,58 @@ def _run_clip_pool(
         raise Get3DEPErrors(errors, vrt_url)
 
 
-def _create_hash(box: tuple[float, float, float, float], res: int, crs: int) -> str:
+def _crs_to_sr(crs: CRSType) -> int | str:
+    """Convert any CRS input to an ArcGIS spatial reference value.
+
+    Returns an EPSG integer (``imageSR=3857``) when one exists, otherwise a
+    WKT JSON string (``imageSR={"wkt":"PROJCS[...]"}``).
+    """
+    from rasterio.crs import CRS as RasterioCRS
+
+    obj = RasterioCRS.from_user_input(crs)
+    epsg = obj.to_epsg()
+    return epsg if epsg is not None else json.dumps({"wkt": obj.to_wkt()})
+
+
+def _normalize_image_server_url(url: str) -> str:
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        msg = f"`url` must use http or https, got: {url!r}"
+        raise ValueError(msg)
+    if not parsed.netloc:
+        msg = f"`url` must include a host, got: {url!r}"
+        raise ValueError(msg)
+    _suffix = "/imageserver/exportimage"
+    path = parsed.path.rstrip("/")
+    if not path.lower().endswith(_suffix):
+        msg = f"`url` must end with '.../ImageServer/exportImage', got: {url!r}"
+        raise ValueError(msg)
+    # Normalize suffix capitalization and drop any query/fragment.
+    clean_path = path[: -len(_suffix)] + "/ImageServer/exportImage"
+    return parsed._replace(path=clean_path, params="", query="", fragment="").geturl()
+
+
+def _create_hash(box: tuple[float, float, float, float], res: int, crs: int | str) -> str:
     """Create a hash from bbox, resolution, and CRS."""
     return hashlib.sha256(",".join(map(str, [*box, res, crs])).encode()).hexdigest()
+
+
+def _create_image_server_hash(
+    box: tuple[float, float, float, float],
+    res: int,
+    crs: int | str,
+    url: str,
+    rendering_rule: dict[str, Any] | None,
+) -> str:
+    """Create a cache key for ArcGIS ImageServer export requests."""
+    cache_key = {
+        "bbox": box,
+        "crs": crs,
+        "rendering_rule": rendering_rule,
+        "res": res,
+        "url": url,
+    }
+    return hashlib.sha256(json.dumps(cache_key, sort_keys=True).encode()).hexdigest()
 
 
 def get_dem(
@@ -370,7 +427,7 @@ def get_dem(
 
     Notes
     -----
-    If you need a different resolution, use the ``get_map`` function
+    If you need a different resolution, use the :func:`get_map` function
     with ``map_type="DEM"``.
 
     Parameters
@@ -406,7 +463,7 @@ def get_dem(
     ------
     Get3DEPErrors
         If one or more tiles fail to download. Already-completed tiles are
-        kept on disk so re-running ``get_dem`` resumes from the failures.
+        kept on disk so re-running :func:`get_map` resumes from the failures.
     """
     if res not in VRTLinks:
         msg = "`res` must be one of 10, 30, or 60 meters."
@@ -438,6 +495,90 @@ def get_dem(
     return tiff_list
 
 
+def get_image_server(
+    url: str,
+    bbox: Sequence[float],
+    save_dir: str | Path,
+    name: str,
+    image_crs: CRSType,
+    res: int,
+    *,
+    pixel_max: int | None = MAX_PIXELS,
+    buff_npixels: int = 0,
+    rendering_rule: dict[str, Any] | None = None,
+) -> list[Path]:
+    """Download tiled GeoTiffs from any ArcGIS ``ImageServer/exportImage`` endpoint.
+
+    Parameters
+    ----------
+    url : str
+        Full URL of an ArcGIS ImageServer ``exportImage`` endpoint, e.g.
+        ``https://server/arcgis/rest/services/Layer/ImageServer/exportImage``.
+    bbox : tuple
+        Bounding box in decimal degrees (WGS84): (west, south, east, north).
+    save_dir : str or pathlib.Path
+        Directory to save the GeoTiff files.
+    name : str
+        Prefix used when naming the output files.
+    image_crs : int, str, or rasterio.crs.CRS
+        Output image CRS passed as ``imageSR``. Accepts anything
+        ``rasterio.crs.CRS.from_user_input`` understands (EPSG integer, authority
+        string such as ``"EPSG:3857"``, or a CRS object). Resolved to an EPSG
+        WKID when one exists, otherwise serialized as a WKT JSON string. Not
+        all services support every CRS; check the service capabilities first.
+    res : int
+        Target resolution in meters.
+    pixel_max : int, optional
+        Maximum pixels per tile for bbox decomposition, by default 8 million.
+        Pass ``None`` to download as a single file. Values above 8 million are
+        not allowed.
+    buff_npixels : int, optional
+        Pixel buffer around each tile when the bbox is decomposed, by default 0.
+    rendering_rule : dict, optional
+        Esri rendering rule serialized as the ``renderingRule`` JSON parameter,
+        e.g. ``{"rasterFunction": "Hillshade Gray"}``. ``None`` returns raw
+        pixel values (elevation/DEM).
+
+    Returns
+    -------
+    list of pathlib.Path
+        GeoTiff files covering the bounding box.
+    """
+    url = _normalize_image_server_url(url)
+    if pixel_max is not None and pixel_max > MAX_PIXELS:
+        msg = f"`pixel_max` must be less than {MAX_PIXELS}."
+        raise ValueError(msg)
+
+    sr = image_crs if isinstance(image_crs, int) else _crs_to_sr(image_crs)
+    bbox = _check_bbox(bbox)
+    bbox_list, sub_width, sub_height = decompose_bbox(bbox, res, pixel_max, buff_npixels)
+    save_dir = Path(save_dir)
+    save_dir.mkdir(parents=True, exist_ok=True)
+
+    tiff_list = [
+        save_dir / f"{name}_{_create_image_server_hash(box, res, sr, url, rendering_rule)}.tiff"
+        for box in bbox_list
+    ]
+    if all(tiff.exists() for tiff in tiff_list):
+        return tiff_list
+
+    params: dict[str, Any] = {
+        "bboxSR": 4326,
+        "imageSR": sr,
+        "size": f"{sub_width},{sub_height}",
+        "format": "tiff",
+        "interpolation": "RSP_BilinearInterpolation",
+        "f": "image",
+    }
+    if rendering_rule is not None:
+        params["renderingRule"] = json.dumps(rendering_rule)
+
+    qs = urlencode(params)
+    pq_list = [f"{url}?bbox={','.join(str(round(c, 6)) for c in box)}&{qs}" for box in bbox_list]
+    terry.download(pq_list, tiff_list)
+    return tiff_list
+
+
 def get_map(
     map_type: MapTypes,
     bbox: Sequence[float],
@@ -466,7 +607,7 @@ def get_map(
         - ``'Contour 25'``
         - ``'Contour Smoothed 25'``
     bbox : tuple
-        Bounding box coordinates in decimal degrees (WG84): (west, south, east, north).
+        Bounding box coordinates in decimal degrees (WGS84): (west, south, east, north).
     save_dir : str or pathlib.Path
         Path to save the GeoTiff files.
     res : int, optional
@@ -489,38 +630,68 @@ def get_map(
         msg = f"`map_type` must be one of {VALID_MAP_TYPES}."
         raise ValueError(msg)
 
-    if pixel_max is not None and pixel_max > MAX_PIXELS:
-        msg = f"`pixel_max` must be less than {MAX_PIXELS}."
-        raise ValueError(msg)
+    _check_bounds(_check_bbox(bbox), (-180.0, -15.0, 180.0, 84.0))
+    rendering_rule = None if map_type == "DEM" else {"rasterFunction": map_type}
+    return get_image_server(
+        _3DEP_URL,
+        bbox,
+        save_dir,
+        map_type.replace(" ", "_").lower(),
+        3857,
+        res=res,
+        pixel_max=pixel_max,
+        buff_npixels=buff_npixels,
+        rendering_rule=rendering_rule,
+    )
 
-    bbox = _check_bbox(bbox)
-    bbox_list, sub_width, sub_height = decompose_bbox(bbox, res, pixel_max, buff_npixels)
 
-    _check_bounds(bbox, (-180.0, -15.0, 180.0, 84.0))
-    save_dir = Path(save_dir)
-    save_dir.mkdir(parents=True, exist_ok=True)
+def get_global_dem(
+    bbox: Sequence[float],
+    save_dir: str | Path,
+    *,
+    res: int = 30,
+    pixel_max: int | None = MAX_PIXELS,
+    buff_npixels: int = 0,
+) -> list[Path]:
+    """Get the NOAA global DEM mosaic in 3857 coordinate system.
 
-    rule = map_type.replace(" ", "_").lower()
-    tiff_list = [save_dir / f"{rule}_{_create_hash(box, res, 3857)}.tiff" for box in bbox_list]
-    if all(tiff.exists() for tiff in tiff_list):
-        return tiff_list
+    The NOAA global mosaic blends SRTM, GEBCO, ICESat, and other sources into a
+    single seamless worldwide layer. Unlike :func:`get_map`, it covers the entire
+    globe and includes sub-zero bathymetric values (down to roughly -9982 m).
+    Native resolution is approximately 1 arc-second (~30 m) over most of the
+    world; finer values will upsample from that source.
 
-    params = {
-        "bboxSR": 4326,
-        "imageSR": 3857,
-        "size": f"{sub_width},{sub_height}",
-        "format": "tiff",
-        "interpolation": "RSP_BilinearInterpolation",
-        "f": "image",
-    }
-    if map_type != "DEM":
-        params["renderingRule"] = f'{{"rasterFunction":"{map_type}"}}'
+    Parameters
+    ----------
+    bbox : tuple
+        Bounding box in decimal degrees (WGS84): (west, south, east, north).
+    save_dir : str or pathlib.Path
+        Path to save the GeoTiff files.
+    res : int, optional
+        Target resolution in meters, by default 30 to match the global mosaic's
+        native ~1 arc-second resolution.
+    pixel_max : int, optional
+        Maximum pixels per tile for bbox decomposition, by default 8 million.
+        Pass ``None`` to download as a single file. Values above 8 million are
+        not allowed.
+    buff_npixels : int, optional
+        Pixel buffer around each tile when the bbox is decomposed, by default 0.
 
-    url = "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage"
-    qs = urlencode(params)
-    pq_list = [f"{url}?bbox={','.join(str(round(c, 6)) for c in box)}&{qs}" for box in bbox_list]
-    terry.download(pq_list, tiff_list)
-    return tiff_list
+    Returns
+    -------
+    list of pathlib.Path
+        GeoTiff files covering the bounding box.
+    """
+    return get_image_server(
+        _NOAA_GLOBAL_URL,
+        bbox,
+        save_dir,
+        "noaa_global",
+        3857,
+        res=res,
+        pixel_max=pixel_max,
+        buff_npixels=buff_npixels,
+    )
 
 
 @overload
@@ -582,7 +753,7 @@ def build_vrt(
         msg = "No valid files found."
         raise ValueError(msg)
 
-    command: list[str] = ["gdalbuildvrt", "-r", "nearest", "-overwrite"]
+    command = ["gdalbuildvrt", "-r", "nearest", "-overwrite"]
     if pixel_function is not None:
         command += ["-pixel-function", pixel_function]
     command += [_path2str(vrt_path), *_path2str(tiff_files)]
@@ -642,7 +813,7 @@ def tiffs_to_da(
         Coordinate reference system of the input geometry, by default 4326.
     pixel_function : str, optional
         VRT pixel function for resolving overlap between tiles, forwarded
-        to :func:`build_vrt`. Defaults to ``None`` (gdalbuildvrt's
+        to :func:`build_vrt`. Defaults to ``None`` (``gdalbuildvrt``'s
         "last input wins"). Use e.g. ``"mean"`` or ``"first"`` when
         mosaicking per-tile post-processed outputs whose overlap pixels
         differ between tiles. Requires GDAL 3.12+.
@@ -703,8 +874,8 @@ def _transform_xy(
         buf = tuple(islice(_xy, 0, 256))
         if not buf:
             break
-        rows, cols = rowcol(dt, *zip(*buf, strict=False), op=lambda x: x)
-        yield from zip(rows, cols, strict=False)
+        rows, cols = rowcol(dt, *zip(*buf), op=lambda x: x)
+        yield from zip(rows, cols)
 
 
 def _sample_window(

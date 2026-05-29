@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import itertools
+import json
 import math
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Self
 
 import numpy as np
 import pytest
@@ -12,7 +14,15 @@ import shapely
 
 import seamless_3dep as s3dep
 from seamless_3dep._vrt_pools import VRTPool
-from seamless_3dep.seamless_3dep import _check_bbox, _check_bounds, _snap_window
+from seamless_3dep.seamless_3dep import (
+    _3DEP_URL,
+    _check_bbox,
+    _check_bounds,
+    _clip_with_retry,
+    _crs_to_sr,
+    _normalize_image_server_url,
+    _snap_window,
+)
 
 
 @pytest.fixture
@@ -374,6 +384,58 @@ def test_get_dem_cache_hit_skips_network(tmp_path, monkeypatch):
     assert out == [expected]
 
 
+def test_clip_with_retry_does_not_leave_partial_cache_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class FakeSource:
+        meta = {
+            "count": 1,
+            "crs": "EPSG:4326",
+            "driver": "GTiff",
+            "dtype": "float32",
+            "height": 1,
+            "transform": rasterio.transform.from_origin(0.0, 1.0, 1.0, 1.0),
+            "width": 1,
+        }
+
+        def read(self, *, window: rasterio.windows.Window) -> np.ndarray:
+            return np.ones((1, int(window.height), int(window.width)), dtype="float32")
+
+    class FailingWriter:
+        def __init__(self, path: Path) -> None:
+            self.path = Path(path)
+
+        def __enter__(self) -> Self:
+            self.path.touch()
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def write(self, data: np.ndarray) -> None:
+            msg = "simulated write failure"
+            raise rasterio.errors.RasterioIOError(msg)
+
+    def fail_open(path: Path, *args: object, **kwargs: object) -> FailingWriter:
+        return FailingWriter(path)
+
+    monkeypatch.setattr("seamless_3dep.seamless_3dep.rasterio.open", fail_open)
+    monkeypatch.setattr("seamless_3dep.seamless_3dep.time.sleep", lambda delay: None)
+
+    target = tmp_path / "tile.tiff"
+    with pytest.raises(rasterio.errors.RasterioIOError, match="simulated write failure"):
+        _clip_with_retry(
+            FakeSource(),
+            (0.0, 0.0, 1.0, 1.0),
+            target,
+            rasterio.transform.from_origin(0.0, 1.0, 1.0, 1.0),
+            math.nan,
+        )
+
+    assert not target.exists()
+    assert not target.with_name(f".{target.name}.tmp").exists()
+
+
 def test_build_vrt_failure():
     """Test that `build_vrt` raises an error when given empty TIFF files."""
     with TemporaryDirectory() as tmpdir:
@@ -414,6 +476,167 @@ def test_subpixel_interpolation():
     # With proper sub-pixel interpolation, nearly all values should be unique
     # Without it (pixel snapping), many points would share the same value
     assert n_unique > elev.size * 0.8
+
+
+@pytest.mark.parametrize(
+    ("url", "expected"),
+    [
+        # canonical URL — passes through unchanged
+        (
+            "https://host.example/arcgis/rest/services/Layer/ImageServer/exportImage",
+            "https://host.example/arcgis/rest/services/Layer/ImageServer/exportImage",
+        ),
+        # trailing slash stripped
+        (
+            "https://host.example/arcgis/rest/services/Layer/ImageServer/exportImage/",
+            "https://host.example/arcgis/rest/services/Layer/ImageServer/exportImage",
+        ),
+        # query string stripped
+        (
+            "https://host.example/arcgis/rest/services/Layer/ImageServer/exportImage?f=json",
+            "https://host.example/arcgis/rest/services/Layer/ImageServer/exportImage",
+        ),
+        # fragment stripped
+        (
+            "https://host.example/arcgis/rest/services/Layer/ImageServer/exportImage#section",
+            "https://host.example/arcgis/rest/services/Layer/ImageServer/exportImage",
+        ),
+        # suffix case normalized
+        (
+            "https://host.example/arcgis/rest/services/Layer/imageserver/exportimage",
+            "https://host.example/arcgis/rest/services/Layer/ImageServer/exportImage",
+        ),
+        # all normalizations at once
+        (
+            "HTTPS://host.example/arcgis/rest/services/Layer/IMAGESERVER/EXPORTIMAGE/?f=json#frag",
+            "https://host.example/arcgis/rest/services/Layer/ImageServer/exportImage",
+        ),
+        # http is also accepted
+        (
+            "http://host.example/arcgis/rest/services/Layer/ImageServer/exportImage",
+            "http://host.example/arcgis/rest/services/Layer/ImageServer/exportImage",
+        ),
+    ],
+)
+def test_normalize_image_server_url_valid(url: str, expected: str) -> None:
+    assert _normalize_image_server_url(url) == expected
+
+
+@pytest.mark.parametrize(
+    ("bad_url", "match"),
+    [
+        ("ftp://host.example/Layer/ImageServer/exportImage", "http or https"),
+        ("not-a-url", "http or https"),
+        ("https:///Layer/ImageServer/exportImage", "host"),
+        ("https://host.example/Layer/exportImage", r"ImageServer/exportImage"),
+        ("https://host.example/Layer/ImageServer/", r"ImageServer/exportImage"),
+    ],
+)
+def test_normalize_image_server_url_invalid(bad_url: str, match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        _normalize_image_server_url(bad_url)
+
+
+def test_crs_to_sr_epsg_string() -> None:
+    assert _crs_to_sr("EPSG:3857") == 3857
+
+
+def test_crs_to_sr_epsg_int() -> None:
+    assert _crs_to_sr(4326) == 4326
+
+
+def test_crs_to_sr_wkt_fallback() -> None:
+    from rasterio.crs import CRS
+
+    # Azimuthal equidistant at an arbitrary origin has no standard EPSG code.
+    custom = CRS.from_proj4("+proj=aeqd +lat_0=45 +lon_0=-100 +datum=WGS84")
+    result = _crs_to_sr(custom)
+    assert isinstance(result, str)
+    assert "wkt" in json.loads(result)
+
+
+def test_get_image_server_cache_key_includes_source_params(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    bbox = (-121.001, 37.001, -121.0, 37.002)
+    url_a = "https://host.example/arcgis/rest/services/A/ImageServer/exportImage"
+    url_b = "https://host.example/arcgis/rest/services/B/ImageServer/exportImage"
+    downloads: list[tuple[list[str], list[Path]]] = []
+
+    def fake_download(urls: list[str], paths: list[Path]) -> None:
+        downloads.append((urls, paths))
+        for path in paths:
+            path.touch()
+
+    monkeypatch.setattr("seamless_3dep.seamless_3dep.terry.download", fake_download)
+
+    hillshade = s3dep.get_image_server(
+        url_a,
+        bbox,
+        tmp_path,
+        "same_name",
+        3857,
+        30,
+        rendering_rule={"rasterFunction": "Hillshade Gray"},
+    )
+    slope = s3dep.get_image_server(
+        url_a,
+        bbox,
+        tmp_path,
+        "same_name",
+        3857,
+        30,
+        rendering_rule={"rasterFunction": "Slope Degrees"},
+    )
+    other_source = s3dep.get_image_server(
+        url_b,
+        bbox,
+        tmp_path,
+        "same_name",
+        3857,
+        30,
+        rendering_rule={"rasterFunction": "Slope Degrees"},
+    )
+
+    assert hillshade != slope
+    assert slope != other_source
+    assert len(downloads) == 3
+
+    cached = s3dep.get_image_server(
+        url_a,
+        bbox,
+        tmp_path,
+        "same_name",
+        3857,
+        30,
+        rendering_rule={"rasterFunction": "Hillshade Gray"},
+    )
+    assert cached == hillshade
+    assert len(downloads) == 3
+
+
+@pytest.mark.network
+def test_get_image_server(tmp_path: Path) -> None:
+    bbox = (-121.1, 37.9, -121.0, 38.0)
+    files = s3dep.get_image_server(_3DEP_URL, bbox, tmp_path / "img_server", "test", 3857, res=30)
+    assert len(files) == 1
+    with rasterio.open(files[0]) as ds:
+        assert ds.crs.to_epsg() == 3857
+        data = ds.read(1)
+        assert data.shape[0] > 0
+        assert data.max() > 0
+
+
+@pytest.mark.network
+def test_get_global_dem(tmp_path: Path) -> None:
+    bbox = (-121.1, 37.9, -121.0, 38.0)
+    files = s3dep.get_global_dem(bbox, tmp_path / "global_dem")
+    assert len(files) == 1
+    with rasterio.open(files[0]) as ds:
+        assert ds.crs.to_epsg() == 3857
+        data = ds.read(1)
+        assert data.shape[0] > 0
+        assert data.max() > 0
 
 
 @pytest.fixture(scope="session", autouse=True)
