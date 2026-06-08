@@ -7,6 +7,36 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+
+## [0.5.2] - 2026-05-29
+
+### Added
+
+- Add a `resampling` parameter to `build_vrt` (default `"nearest"`) that is forwarded to
+    `gdalbuildvrt -r`. `"nearest"` avoids propagating NaN from tile-boundary fringe pixels
+    into the mosaic interior when source tiles have slightly different pixel grids. Use
+    `"bilinear"` or higher only when smooth blending across deliberately different
+    resolutions is needed.
+- Add a `use_vrt` parameter to `tiffs_to_da` (default `False`). When `False` (default),
+    tiles are mosaicked in memory via `rioxarray.merge.merge_arrays` backed by
+    `rasterio.merge` — no `gdalbuildvrt` CLI or `libgdal`/`gdal` conda package required,
+    only `rasterio` and `rioxarray`. Pass `use_vrt=True` to use the previous VRT-based
+    path (requires `gdalbuildvrt`), which supports the full set of GDAL pixel functions
+    such as `"mean"` and `"median"`. The in-memory path supports `None`, `"first"`,
+    `"min"`, and `"max"`.
+
+### Changed
+
+- `tiffs_to_da` no longer requires `shapely`. The `geometry` parameter now accepts any
+    object that exposes a `.bounds` attribute (e.g., any shapely or GeoJSON-backed
+    geometry) in addition to a `(west, south, east, north)` bounding box tuple. Passing a
+    geometry object still clips to its exact shape; a plain tuple clips to the envelope
+    only.
+- `build_vrt` now automatically sets `-vrtnodata nan` for float rasters so uncovered
+    mosaic gaps appear as `NaN` rather than the source file's finite nodata sentinel
+    (e.g., `-9999` or `-3.4e38`).
+
 ## [0.5.1] - 2026-05-29
 
 ### Added

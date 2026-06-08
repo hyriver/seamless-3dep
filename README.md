@@ -81,15 +81,19 @@ processing:
 - `decompose_bbox`: Handles large area requests by breaking down extensive bounding
     boxes into optimal sizes based on resolution and maximum pixel count, ensuring
     efficient data retrieval.
-- `build_vrt`: Creates virtual raster datasets by combining multiple GeoTIFF files.
-    Requires `libgdal-core` installation and supports efficient data handling for large
-    areas. Note that `libgdal-core` is an optional dependency and is not installed when
-    `seamless-3dep` is installed from PyPI. However, it is installed as a dependency
-    when `seamless-3dep` is installed from `conda-forge`.
-- `tiffs_to_da`: Converts a list of GeoTIFF files to an `xarray.DataArray` object. This
-    function is useful for combining multiple GeoTIFF files that `get_map`, `get_dem`,
-    and `get_global_dem` produce into a single `xarray.DataArray` for further analysis.
-    Note that `shapely` and `rioxarray` need to be installed to use this function.
+- `build_vrt`: Creates a virtual raster dataset by combining multiple GeoTIFF files via
+    the `gdalbuildvrt` CLI. Supports a `resampling` parameter (default `"nearest"`) and
+    automatically sets NaN as the nodata value for float rasters so mosaic gaps appear as
+    `NaN` rather than finite sentinels. Requires the `libgdal`/`gdal` conda-forge package
+    (which ships `gdalbuildvrt`); note that `libgdal-core` provides the library but not
+    the CLI utilities.
+- `tiffs_to_da`: Mosaics a list of GeoTIFF files and returns a clipped
+    `xarray.DataArray`. By default (`use_vrt=False`) tiles are merged in memory via
+    `rioxarray.merge.merge_arrays` — only `rioxarray` is required, no `gdalbuildvrt` CLI
+    or `shapely`. Pass `use_vrt=True` to mosaic through a VRT file instead, which enables
+    GDAL pixel functions such as `"mean"` and `"median"` but requires `gdalbuildvrt`. The
+    `geometry` parameter accepts any object with a `.bounds` attribute (e.g., any shapely
+    geometry) or a plain `(west, south, east, north)` bounding box tuple.
 
 ## Important Notes
 
