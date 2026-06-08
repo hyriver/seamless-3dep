@@ -39,13 +39,11 @@
 # %%
 from __future__ import annotations
 
-import shutil
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from tempfile import TemporaryDirectory
 
 import geopandas as gpd
-import pywbt
+import whitebox_workflows as wbw
 
 import seamless_3dep as s3dep
 
@@ -59,7 +57,7 @@ import seamless_3dep as s3dep
 url = "https://reference.geoconnex.us/collections/hu08/items/10190005"
 vrain = gpd.read_file(url)
 geom_org = vrain.to_crs(4326).union_all()
-geom = vrain.to_crs(3857).buffer(5e3).to_crs(4326).union_all()
+geom = vrain.to_crs(3857).buffer(20e3).to_crs(4326).union_all()
 
 data_dir = Path("data")
 tiff_files = s3dep.get_map("DEM", geom.bounds, data_dir, 10, buff_npixels=10)
@@ -72,31 +70,26 @@ tiff_files = s3dep.get_map("DEM", geom.bounds, data_dir, 10, buff_npixels=10)
 
 
 # %%
+wbe = wbw.WbEnvironment()
+
+
 def compute_twi(dem_path: Path) -> Path:
     twi_path = dem_path.with_name(dem_path.name.replace("dem", "twi"))
-    slope_path = dem_path.with_name(dem_path.name.replace("dem", "slope"))
     if twi_path.exists():
         return twi_path
-    with TemporaryDirectory(dir=dem_path.parent) as temp:
-        shutil.copy(dem_path, temp)
-        wbt_args = {
-            "BreachDepressions": [f"-i={dem_path.name}", "--fill_pits", "-o=dem_corr.tiff"],
-            "D8Pointer": ["-i=dem_corr.tiff", "-o=fdir.tiff"],
-            "D8FlowAccumulation": [
-                "-i=fdir.tiff",
-                "--pntr",
-                "--out_type='specific contributing area'",
-                "-o=sca.tiff",
-            ],
-            "Slope": ["-i=dem_corr.tiff", "--units=degrees", f"-o={slope_path.name}"],
-            "WetnessIndex": [
-                "--sca=sca.tiff",
-                f"--slope={slope_path.name}",
-                f"-o={twi_path.name}",
-            ],
-        }
-        pywbt.whitebox_tools(temp, wbt_args, [twi_path.name], temp, max_procs=1)
-        shutil.copy(Path(temp) / twi_path.name, twi_path)
+    dem = wbe.read_raster(dem_path.as_posix())
+    dem = wbe.hydrology.depressions_storage.breach_depressions_least_cost(
+        dem=dem, dist=50, minimize_dist=True, flat_increment=None, fill_deps=True
+    )
+    dinf_pntr = wbe.hydrology.flow_routing.dinf_pointer(dem=dem)
+    sca = wbe.hydrology.flow_routing.dinf_flow_accum(input=dinf_pntr, out_type="sca")
+    slope_rad = wbe.terrain.derivatives.slope(input=dem, units="radians")
+
+    # Avoid log(0) by clamping minimum SCA and slope values
+    sca_clamped = sca.max(0.001)
+    slope_clamped = slope_rad.max(0.001)
+    twi = (sca_clamped / slope_clamped.tan()).log1p()
+    wbe.write_raster(twi, twi_path.as_posix())
     return twi_path
 
 
