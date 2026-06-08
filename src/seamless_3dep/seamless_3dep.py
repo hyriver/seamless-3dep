@@ -19,21 +19,28 @@ from urllib.parse import urlencode, urlparse
 
 import numpy as np
 import rasterio
-import rasterio.errors
 import rasterio.windows
 import tiny_retriever as terry
-from rasterio.enums import MaskFlags, Resampling
+from rasterio.crs import CRS
+from rasterio.enums import Resampling
+from rasterio.errors import RasterioIOError
 from rasterio.transform import rowcol
 
 from seamless_3dep._vrt_pools import VRTLinks, VRTPool
 
 if TYPE_CHECKING:
+    from typing import Protocol
+
     from numpy.typing import ArrayLike, NDArray
-    from rasterio.crs import CRS
     from rasterio.io import DatasetReader
     from rasterio.transform import Affine
-    from shapely import Polygon
     from xarray import DataArray
+
+    class GeometryLike(Protocol):
+        """A geometry exposing a shapely-style ``(minx, miny, maxx, maxy)`` envelope."""
+
+        @property
+        def bounds(self) -> tuple[float, float, float, float]: ...
 
     MapTypes = Literal[
         "DEM",
@@ -68,11 +75,15 @@ DEFAULT_MAX_WORKERS = 8
 _RETRY_ATTEMPTS = 3
 _RETRY_BASE_DELAY = 0.5
 _RETRY_BACKOFF = 3.0
-_RETRY_EXCEPTIONS = (rasterio.errors.RasterioIOError, OSError)
+_RETRY_EXCEPTIONS = (RasterioIOError, OSError)
+# Pixel functions with a direct `rasterio.merge` equivalent, used by the
+# rioxarray mosaic path in `tiffs_to_da` (``use_vrt=False``).
+_MERGE_METHODS = {"first": "first", "min": "min", "max": "max"}
 
 
 class Get3DEPErrors(Exception):
-    """Raised when one or more tiles fail to download from 3DEP.
+    """
+    Raised when one or more tiles fail to download from 3DEP.
 
     Carries the per-tile failures in :attr:`errors` so callers can inspect
     each failure and decide whether to retry. Already-downloaded tiles are
@@ -84,6 +95,7 @@ class Get3DEPErrors(Exception):
         The exceptions raised by individual tile downloads.
     vrt_url : str
         The source VRT URL the failed tiles were being read from.
+
     """
 
     def __init__(self, errors: list[BaseException], vrt_url: str) -> None:
@@ -171,7 +183,8 @@ def decompose_bbox(
     pixel_max: int | None,
     buff_npixels: int = 0,
 ) -> tuple[list[tuple[float, float, float, float]], int, int]:
-    """Divide a Bbox into equal-area sub-bboxes based on pixel count.
+    """
+    Divide a Bbox into equal-area sub-bboxes based on pixel count.
 
     Parameters
     ----------
@@ -199,6 +212,7 @@ def decompose_bbox(
     sub_height : int
         Pixel height of each sub-bbox, including buffer pixels on both sides
         when ``buff_npixels > 0``.
+
     """
     west, south, east, north = _check_bbox(bbox)
     x_dist = _haversine_distance(south, west, south, east)
@@ -239,7 +253,8 @@ def decompose_bbox(
 
 
 def _snap_window(window: rasterio.windows.Window) -> rasterio.windows.Window:
-    """Snap a fractional Window to integer pixel boundaries.
+    """
+    Snap a fractional Window to integer pixel boundaries.
 
     ``rasterio.windows.from_bounds`` returns a Window with fractional
     offsets and lengths. If we hand that to GDAL as-is, the float-to-int
@@ -273,7 +288,8 @@ def _clip_with_retry(
     transform: Affine,
     nodata: float,
 ) -> None:
-    """Clip one tile from ``src`` to ``path``, retrying on transient I/O errors.
+    """
+    Clip one tile from ``src`` to ``path``, retrying on transient I/O errors.
 
     Reads through a shared thread-safe ``DatasetReader``. GDAL's internal
     locking serializes individual reads on the dataset object, so a
@@ -320,7 +336,8 @@ def _run_clip_pool(
     nodata: float,
     n_workers: int,
 ) -> None:
-    """Clip a batch of sub-bboxes from ``vrt_url`` concurrently.
+    """
+    Clip a batch of sub-bboxes from ``vrt_url`` concurrently.
 
     Opens a single thread-safe ``DatasetReader`` (rasterio 1.5+, GDAL 3.10+)
     and shares it across all workers — GDAL itself serializes individual
@@ -362,14 +379,13 @@ def _run_clip_pool(
 
 
 def _crs_to_sr(crs: CRSType) -> int | str:
-    """Convert any CRS input to an ArcGIS spatial reference value.
+    """
+    Convert any CRS input to an ArcGIS spatial reference value.
 
     Returns an EPSG integer (``imageSR=3857``) when one exists, otherwise a
     WKT JSON string (``imageSR={"wkt":"PROJCS[...]"}``).
     """
-    from rasterio.crs import CRS as RasterioCRS
-
-    obj = RasterioCRS.from_user_input(crs)
+    obj = CRS.from_user_input(crs)
     epsg = obj.to_epsg()
     return epsg if epsg is not None else json.dumps({"wkt": obj.to_wkt()})
 
@@ -423,7 +439,8 @@ def get_dem(
     buff_npixels: int = 0,
     max_workers: int | None = None,
 ) -> list[Path]:
-    """Get DEM from 3DEP at 10, 30, or 60 meters resolutions.
+    """
+    Get DEM from 3DEP at 10, 30, or 60 meters resolutions.
 
     Notes
     -----
@@ -464,6 +481,7 @@ def get_dem(
     Get3DEPErrors
         If one or more tiles fail to download. Already-completed tiles are
         kept on disk so re-running :func:`get_map` resumes from the failures.
+
     """
     if res not in VRTLinks:
         msg = "`res` must be one of 10, 30, or 60 meters."
@@ -507,7 +525,8 @@ def get_image_server(
     buff_npixels: int = 0,
     rendering_rule: dict[str, Any] | None = None,
 ) -> list[Path]:
-    """Download tiled GeoTiffs from any ArcGIS ``ImageServer/exportImage`` endpoint.
+    """
+    Download tiled GeoTiffs from any ArcGIS ``ImageServer/exportImage`` endpoint.
 
     Parameters
     ----------
@@ -543,6 +562,7 @@ def get_image_server(
     -------
     list of pathlib.Path
         GeoTiff files covering the bounding box.
+
     """
     url = _normalize_image_server_url(url)
     if pixel_max is not None and pixel_max > MAX_PIXELS:
@@ -587,7 +607,8 @@ def get_map(
     pixel_max: int | None = MAX_PIXELS,
     buff_npixels: int = 0,
 ) -> list[Path]:
-    """Get topo maps in 3857 coordinate system within US from 3DEP at any resolution.
+    """
+    Get topo maps in 3857 coordinate system within US from 3DEP at any resolution.
 
     Parameters
     ----------
@@ -625,6 +646,7 @@ def get_map(
     -------
     list of pathlib.Path
         list of GeoTiff files containing the DEM clipped to the bounding box.
+
     """
     if map_type not in VALID_MAP_TYPES:
         msg = f"`map_type` must be one of {VALID_MAP_TYPES}."
@@ -653,7 +675,8 @@ def get_global_dem(
     pixel_max: int | None = MAX_PIXELS,
     buff_npixels: int = 0,
 ) -> list[Path]:
-    """Get the NOAA global DEM mosaic in 3857 coordinate system.
+    """
+    Get the NOAA global DEM mosaic in 3857 coordinate system.
 
     The NOAA global mosaic blends SRTM, GEBCO, ICESat, and other sources into a
     single seamless worldwide layer. Unlike :func:`get_map`, it covers the entire
@@ -681,6 +704,7 @@ def get_global_dem(
     -------
     list of pathlib.Path
         GeoTiff files covering the bounding box.
+
     """
     return get_image_server(
         _NOAA_GLOBAL_URL,
@@ -713,8 +737,12 @@ def build_vrt(
     tiff_files: list[str] | list[Path],
     *,
     pixel_function: str | None = None,
+    resampling: Literal[
+        "nearest", "bilinear", "cubic", "cubicspline", "lanczos", "average", "mode"
+    ] = "nearest",
 ) -> None:
-    """Create a VRT from a list of GeoTIFF tiles.
+    """
+    Create a VRT from a list of GeoTIFF tiles.
 
     Notes
     -----
@@ -741,10 +769,32 @@ def build_vrt(
         differ between tiles. Common values: ``"first"``, ``"mean"``,
         ``"median"``, ``"min"``, ``"max"``, ``"mode"``,
         ``"geometric_mean"``, ``"harmonic_mean"``. Requires GDAL 3.12+.
+    resampling : str, optional
+        Resampling method to use when building the VRT, by default ``"nearest"``.
+        ``"nearest"`` avoids propagating NaN from tile-boundary fringe pixels
+        into the mosaic interior when source tiles have slightly different pixel
+        grids (fractional ``DstRect`` offsets). Use ``"bilinear"`` or higher
+        only when you need smooth blending across deliberately different
+        resolutions. Must be one of ``"nearest"``, ``"bilinear"``, ``"cubic"``,
+        ``"cubicspline"``, ``"lanczos"``, ``"average"``, or ``"mode"``. See the
+        GDAL documentation for details:
+        https://gdal.org/programs/gdalbuildvrt.html
+
     """
     if shutil.which("gdalbuildvrt") is None:
-        msg = "GDAL (`libgdal-core`) is required to run `build_vrt`."
+        msg = (
+            "`build_vrt` needs the `gdalbuildvrt` command-line tool, which ships "
+            "with the conda `libgdal`/`gdal` package (note: `libgdal-core` "
+            "provides the library but not the CLI utilities). To mosaic tiles "
+            "without it, use `tiffs_to_da`, which falls back to "
+            "`rioxarray.merge.merge_arrays` when `gdalbuildvrt` is unavailable."
+        )
         raise ImportError(msg)
+
+    valid_resampling = {"nearest", "bilinear", "cubic", "cubicspline", "lanczos", "average", "mode"}
+    if resampling not in valid_resampling:
+        msg = f"`resampling` must be one of {valid_resampling}, got: {resampling!r}"
+        raise ValueError(msg)
 
     vrt_path = Path(vrt_path).resolve()
     tiff_files = [Path(f).resolve() for f in tiff_files]
@@ -753,7 +803,17 @@ def build_vrt(
         msg = "No valid files found."
         raise ValueError(msg)
 
-    command = ["gdalbuildvrt", "-r", "nearest", "-overwrite"]
+    _is_float = False
+    with contextlib.suppress(RasterioIOError), rasterio.open(tiff_files[0]) as probe:
+        _is_float = np.issubdtype(np.dtype(probe.dtypes[0]), np.floating)
+
+    command = ["gdalbuildvrt", "-r", resampling, "-overwrite"]
+    # For float rasters declare NaN as the VRT nodata so mosaic gaps appear as
+    # NaN rather than the source's finite sentinel (e.g. -9999 or -3.4e38).
+    # gdalbuildvrt already auto-injects each source's intrinsic <NODATA> into
+    # the ComplexSource elements, so we do NOT pass -srcnodata.
+    if _is_float:
+        command += ["-vrtnodata", "nan"]
     if pixel_function is not None:
         command += ["-pixel-function", pixel_function]
     command += [_path2str(vrt_path), *_path2str(tiff_files)]
@@ -764,74 +824,150 @@ def build_vrt(
         raise RuntimeError(msg) from e
 
 
-def _to_poly(
-    geometry: Polygon | Sequence[float],
-) -> tuple[Polygon, bool]:
-    """Return a Shapely geometry and optionally transform to a new CRS.
+def _clip_geometry(
+    geometry: GeometryLike | Sequence[float],
+) -> tuple[tuple[float, float, float, float], GeometryLike | None]:
+    """
+    Resolve a geometry or bounding box into a clip envelope and optional shape.
+
+    No shapely import is needed: any geometry object (e.g. a shapely geometry)
+    is recognized by its ``bounds`` attribute and passed through unchanged for
+    rioxarray to clip against.
 
     Parameters
     ----------
-    geometry : shaple.Geometry or tuple of length 4
-        Any shapely geometry object or a bounding box (minx, miny, maxx, maxy).
+    geometry : geometry or sequence of float
+        A geometry exposing a shapely-style ``bounds`` attribute, or a bounding
+        box ``(west, south, east, north)``.
 
     Returns
     -------
-    geom : shapely.geometry.base.BaseGeometry
-        A shapely geometry object.
-    is_bbox : bool
-        Whether the input geometry was a bounding box.
-    """
-    import shapely
+    bounds : tuple of float
+        The ``(west, south, east, north)`` envelope to clip to.
+    geom : geometry or None
+        The geometry itself when a non-bbox geometry was passed (so the caller
+        can additionally clip to its exact shape), otherwise ``None``.
 
-    is_geom = np.atleast_1d(shapely.is_geometry(geometry))
-    if is_geom.all() and len(is_geom) == 1:
-        ring = shapely.get_exterior_ring(geometry)  # pyright: ignore[reportCallIssue,reportArgumentType]
-        with contextlib.suppress(ValueError):
-            return shapely.Polygon(ring), False
-    if isinstance(geometry, Iterable) and len(geometry) == 4 and np.isfinite(geometry).all():
-        return shapely.box(*geometry), True  # pyright: ignore[reportCallIssue,reportArgumentType]
-    msg = "geometry must be a shapely geometry or tuple of length 4"
+    """
+    bounds = getattr(geometry, "bounds", None)
+    if bounds is not None:
+        west, south, east, north = bounds
+        return (float(west), float(south), float(east), float(north)), cast(
+            "GeometryLike", geometry
+        )
+    if (
+        isinstance(geometry, Sequence)
+        and not isinstance(geometry, (str, bytes))
+        and len(geometry) == 4
+    ):
+        with contextlib.suppress(TypeError, ValueError):
+            west, south, east, north = (float(c) for c in geometry)
+            if all(math.isfinite(c) for c in (west, south, east, north)):
+                return (west, south, east, north), None
+    msg = "`geometry` must be a geometry with a `bounds` attribute or a (west, south, east, north) tuple."
     raise TypeError(msg)
+
+
+def _merge_tiffs(tiff_files: list[Path], pixel_function: str | None) -> DataArray:
+    """
+    Mosaic tiles into a single DataArray with rioxarray (no GDAL CLI needed).
+
+    Default mosaic path for :func:`tiffs_to_da` (``use_vrt=False``). Uses
+    :func:`rioxarray.merge.merge_arrays`, backed by ``rasterio.merge`` — both
+    already required — so no VRT file or GDAL command-line tool is involved.
+    Float tiles are read masked so the source nodata sentinel (e.g. ``-9999``)
+    becomes ``NaN``, matching :func:`build_vrt`'s ``-vrtnodata nan``; integer
+    tiles keep their nodata value.
+
+    Overlapping pixels are resolved by ``pixel_function``: ``None`` reproduces
+    ``gdalbuildvrt``'s "last input wins" default. Only the pixel functions with
+    a direct ``rasterio.merge`` equivalent (``"first"``, ``"min"``, ``"max"``)
+    are supported here; others such as ``"mean"`` need the ``gdalbuildvrt`` CLI
+    via ``use_vrt=True``.
+    """
+    import rioxarray as rxr
+    from rioxarray.merge import merge_arrays
+
+    if pixel_function is None:
+        method = "last"
+    elif pixel_function in _MERGE_METHODS:
+        method = _MERGE_METHODS[pixel_function]
+    else:
+        msg = (
+            f"`pixel_function={pixel_function!r}` needs the `gdalbuildvrt` CLI "
+            f"(`use_vrt=True`, conda `libgdal`/`gdal`). Without it, only "
+            f"{sorted(_MERGE_METHODS)} and `None` are supported."
+        )
+        raise ValueError(msg)
+
+    with rasterio.open(tiff_files[0]) as probe:
+        masked = bool(np.issubdtype(np.dtype(probe.dtypes[0]), np.floating))
+
+    arrays = [cast("DataArray", rxr.open_rasterio(f, masked=masked)) for f in tiff_files]
+    try:
+        return merge_arrays(arrays, method=method)
+    finally:
+        for arr in arrays:
+            with contextlib.suppress(Exception):
+                arr.close()
 
 
 def tiffs_to_da(
     tiff_files: list[Path],
-    geometry: Polygon | Sequence[float],
+    geometry: GeometryLike | Sequence[float],
     crs: CRSType = 4326,
     *,
     pixel_function: str | None = None,
+    resampling: Literal[
+        "nearest", "bilinear", "cubic", "cubicspline", "lanczos", "average", "mode"
+    ] = "nearest",
+    use_vrt: bool = False,
 ) -> DataArray:
-    """Convert a list of tiff files to a vrt file and return a xarray.DataArray.
+    """
+    Mosaic a list of tiff files and return a clipped xarray.DataArray.
 
     Parameters
     ----------
     tiff_files : list of Path
         List of file paths to convert to a DataArray.
-    geometry : Polygon or Sequence
-        Polygon or bounding box in the form (west, south, east, north).
+    geometry : geometry or sequence of float
+        A geometry exposing a shapely-style ``bounds`` attribute (e.g. a
+        shapely geometry), or a bounding box ``(west, south, east, north)``.
+        A geometry is additionally clipped to its exact shape; a bounding box
+        clips to the envelope only.
     crs : int, str, or CRS, optional
         Coordinate reference system of the input geometry, by default 4326.
     pixel_function : str, optional
-        VRT pixel function for resolving overlap between tiles, forwarded
-        to :func:`build_vrt`. Defaults to ``None`` (``gdalbuildvrt``'s
-        "last input wins"). Use e.g. ``"mean"`` or ``"first"`` when
-        mosaicking per-tile post-processed outputs whose overlap pixels
-        differ between tiles. Requires GDAL 3.12+.
+        Function for resolving overlap between tiles, by default ``None``
+        ("last input wins"). With ``use_vrt=True`` this is forwarded to
+        :func:`build_vrt` and accepts any GDAL pixel function (e.g.
+        ``"mean"``, requires GDAL 3.12+). With the default in-memory path
+        (``use_vrt=False``) only ``None`` and ``"first"``/``"min"``/``"max"``
+        are supported.
+    resampling : str, optional
+        Resampling method forwarded to :func:`build_vrt`, by default
+        ``"nearest"``. Only used when ``use_vrt=True``; ignored by the
+        in-memory mosaic. See :func:`build_vrt`.
+    use_vrt : bool, optional
+        If ``True``, mosaic via a lazily-read VRT built with the
+        ``gdalbuildvrt`` CLI (requires the conda ``libgdal``/``gdal`` package,
+        not just ``libgdal-core``). If ``False`` (default), mosaic in memory
+        with :func:`rioxarray.merge.merge_arrays`, which needs no GDAL
+        command-line tool — only ``rasterio``/``rioxarray``.
 
     Returns
     -------
     xarray.DataArray
         DataArray containing the clipped data.
+
     """
-    _check_deps("shapely", "rioxarray", caller="tiffs_to_da")
+    _check_deps("rioxarray", caller="tiffs_to_da")
     import rioxarray as rxr
     import xarray as xr
 
     if not isinstance(tiff_files, Iterable):  # pyright: ignore[reportUnnecessaryIsInstance]
         msg_0 = "`tiff_files` must be an iterable of file paths."
         raise TypeError(msg_0)
-
-    geom, is_bbox = _to_poly(geometry)
 
     tiff_files = [Path(f).resolve() for f in tiff_files]
 
@@ -840,26 +976,34 @@ def tiffs_to_da(
         raise ValueError(msg_0)
 
     if len(tiff_files) == 1:
-        file = tiff_files[0]
-    else:
+        da = rxr.open_rasterio(tiff_files[0])
+    elif use_vrt:
         # Hash the full sorted tile list so concurrent calls with different file
         # sets don't race on a shared `<first>.vrt` path (which would otherwise
         # be overwritten and consumed mid-flight by the loser of the race).
         sorted_files = sorted(tiff_files)
         list_hash = hashlib.sha256(
-            "\n".join(p.as_posix() for p in sorted_files).encode()
+            json.dumps(
+                {
+                    "pixel_function": pixel_function,
+                    "resampling": resampling,
+                    "tiff_files": [p.as_posix() for p in sorted_files],
+                },
+                sort_keys=True,
+            ).encode()
         ).hexdigest()[:16]
-        file = sorted_files[0].parent / f"_s3dep_mosaic_{list_hash}.vrt"
-        build_vrt(file, tiff_files, pixel_function=pixel_function)
-    da = rxr.open_rasterio(file)
+        vrt_file = sorted_files[0].parent / f"_s3dep_mosaic_{list_hash}.vrt"
+        build_vrt(vrt_file, tiff_files, pixel_function=pixel_function, resampling=resampling)
+        da = rxr.open_rasterio(vrt_file)
+    else:
+        da = _merge_tiffs(tiff_files, pixel_function)
     if not isinstance(da, xr.DataArray):
-        msg = (
-            f"`rioxarray.open_rasterio({file.as_posix()})` returned "
-            f"{type(da).__name__}, expected DataArray."
-        )
+        msg = f"Expected a DataArray from the tile mosaic, got {type(da).__name__}."
         raise TypeError(msg)
-    da = da.squeeze(drop=True).rio.clip_box(*geom.bounds, crs=crs)
-    if not is_bbox:
+
+    bounds, geom = _clip_geometry(geometry)
+    da = da.squeeze(drop=True).rio.clip_box(*bounds, crs=crs)
+    if geom is not None:
         da = da.rio.clip([geom], crs=crs)
     return da
 
@@ -881,12 +1025,11 @@ def _transform_xy(
 def _sample_window(
     dataset: DatasetReader,
     xy: Iterable[tuple[float, float]],
-    window: int = 5,
-    indexes: int | list[int] | None = None,
-    masked: bool = False,
-    resampling: int = 1,
+    window: int,
+    resampling: int,
 ) -> Generator[NDArray[np.floating], None, None]:
-    """Interpolate pixel values at given coordinates using windowed resampling.
+    """
+    Interpolate pixel values at given coordinates using windowed resampling.
 
     Notes
     -----
@@ -903,11 +1046,6 @@ def _sample_window(
     window : int, optional
         Size of the window to read around each point, must be odd,
         defaults to 5.
-    indexes : int or list of int, optional
-        Indexes of dataset bands to sample, defaults to all bands.
-    masked : bool, optional
-        Whether to mask samples that fall outside the extent of the
-        dataset, defaults to ``False``.
     resampling : int, optional
         Resampling method (see ``rasterio.enums.Resampling``),
         defaults to 1 (bilinear).
@@ -916,25 +1054,14 @@ def _sample_window(
     ------
     numpy.ndarray
         Array of length equal to the number of specified indexes.
+
     """
     height = dataset.height
     width = dataset.width
 
-    if indexes is None:
-        indexes = dataset.indexes
-    elif isinstance(indexes, int):
-        indexes = [indexes]
-    indexes = cast("list[int]", indexes)
+    ds_size: int = len(dataset.indexes)
 
-    nodata = np.full(len(indexes), (dataset.nodata or 0), dtype=dataset.dtypes[0])
-    if masked:
-        mask_flags = [set(dataset.mask_flag_enums[i - 1]) for i in indexes]
-        dataset_is_masked = any(
-            {MaskFlags.alpha, MaskFlags.per_dataset, MaskFlags.nodata} & enums
-            for enums in mask_flags
-        )
-        mask = [not (dataset_is_masked and enums == {MaskFlags.all_valid}) for enums in mask_flags]
-        nodata = np.ma.array(nodata, mask=mask)
+    nodata = np.full(ds_size, (dataset.nodata or 0), dtype=dataset.dtypes[0])
 
     half_window = window // 2
     for row, col in _transform_xy(dataset, xy):
@@ -942,16 +1069,15 @@ def _sample_window(
             col_start = max(0.0, col - half_window)
             row_start = max(0.0, row - half_window)
             data = dataset.read(
-                indexes,
+                dataset.indexes,
                 window=rasterio.windows.Window(
                     col_start,  # pyright: ignore[reportCallIssue]
                     row_start,
                     window,
                     window,
                 ),
-                out_shape=(len(indexes), 1, 1),
+                out_shape=(ds_size, 1, 1),
                 resampling=Resampling(resampling),
-                masked=masked,
             )
             yield data[:, 0, 0]
         else:
@@ -965,7 +1091,8 @@ def elevation_bygrid(
     window: int = 5,
     resampling: int = 1,
 ) -> NDArray[np.floating]:
-    """Sample elevation from 3DEP at a grid of lon/lat coordinates.
+    """
+    Sample elevation from 3DEP at a grid of lon/lat coordinates.
 
     Notes
     -----
@@ -1003,6 +1130,7 @@ def elevation_bygrid(
     numpy.ndarray
         2D array of shape ``(len(lats), len(longs))`` with elevation
         values in meters.
+
     """
     if res not in VRTLinks:
         msg = "`res` must be one of 10, 30, or 60 meters."

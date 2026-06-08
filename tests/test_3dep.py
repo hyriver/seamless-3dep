@@ -3,6 +3,7 @@ from __future__ import annotations
 import itertools
 import json
 import math
+import shutil
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Self
@@ -10,7 +11,6 @@ from typing import Self
 import numpy as np
 import pytest
 import rasterio
-import shapely
 
 import seamless_3dep as s3dep
 from seamless_3dep._vrt_pools import VRTPool
@@ -18,10 +18,20 @@ from seamless_3dep.seamless_3dep import (
     _3DEP_URL,
     _check_bbox,
     _check_bounds,
+    _clip_geometry,
     _clip_with_retry,
     _crs_to_sr,
     _normalize_image_server_url,
     _snap_window,
+)
+
+# `build_vrt` needs the `gdalbuildvrt` CLI, which ships with the conda
+# `libgdal`/`gdal` package but NOT `libgdal-core`. `tiffs_to_da` falls back to
+# `rioxarray.merge.merge_arrays` when it is missing, so only the tests that
+# exercise the VRT path directly require the CLI.
+requires_gdalbuildvrt = pytest.mark.skipif(
+    shutil.which("gdalbuildvrt") is None,
+    reason="`gdalbuildvrt` CLI not installed (only `libgdal-core` present)",
 )
 
 
@@ -213,6 +223,7 @@ def test_decompose_bbox_coverage():
     assert orig_points.issubset(points_covered)
 
 
+@requires_gdalbuildvrt
 @pytest.mark.network
 def test_dem_and_vrt(tmp_path):
     bbox = (-121.1, 37.9, -121.0, 38.0)
@@ -230,9 +241,10 @@ def test_dem_and_vrt(tmp_path):
     vrt_file = dem_dir / "dem.vrt"
     s3dep.build_vrt(vrt_file, tiff_files)
     assert vrt_file.stat().st_size > 0
-    dem = s3dep.tiffs_to_da(tiff_files, bbox, 4326)
+    dem = s3dep.tiffs_to_da(tiff_files, bbox, 4326, use_vrt=True)
     assert dem.shape == (360, 360)
-    dem = s3dep.tiffs_to_da(tiff_files, shapely.box(*bbox), 4326)
+    shapely = pytest.importorskip("shapely")
+    dem = s3dep.tiffs_to_da(tiff_files, shapely.box(*bbox), 4326, use_vrt=True)
     assert dem.shape == (360, 360)
 
 
@@ -289,6 +301,7 @@ def test_3dep(tmp_path):
         assert src.shape == (371, 147)
 
 
+@requires_gdalbuildvrt
 def test_build_vrt_pixel_function_changes_overlap_resolution(tmp_path):
     """`pixel_function="min"` (or "max") must change how overlapping pixels resolve.
 
@@ -336,6 +349,183 @@ def test_build_vrt_pixel_function_changes_overlap_resolution(tmp_path):
             f"pixel_function={fn!r}: overlap row was {data[overlap_row].tolist()!r}, "
             f"expected {expected_overlap}"
         )
+
+
+@requires_gdalbuildvrt
+def test_tiffs_to_da_pixel_function_uses_distinct_vrt_cache(tmp_path):
+    """Different VRT pixel functions must not overwrite each other's lazy reads."""
+    rasterio_transform = pytest.importorskip("rasterio.transform")
+
+    transform = rasterio_transform.from_origin(0.0, 10.0, 1.0, 1.0)
+    profile = {
+        "driver": "GTiff",
+        "dtype": "float32",
+        "width": 4,
+        "height": 4,
+        "count": 1,
+        "transform": transform,
+        "crs": "EPSG:4326",
+    }
+
+    top = tmp_path / "top.tiff"
+    with rasterio.open(top, "w", **profile) as dst:
+        dst.write(np.full((4, 4), 10.0, dtype="float32"), 1)
+
+    bottom = tmp_path / "bottom.tiff"
+    bottom_profile = {**profile, "transform": rasterio_transform.from_origin(0.0, 7.0, 1.0, 1.0)}
+    with rasterio.open(bottom, "w", **bottom_profile) as dst:
+        dst.write(np.full((4, 4), 20.0, dtype="float32"), 1)
+
+    geometry = (0.0, 3.0, 4.0, 10.0)
+    default = s3dep.tiffs_to_da([top, bottom], geometry, use_vrt=True)
+    minimum = s3dep.tiffs_to_da([top, bottom], geometry, pixel_function="min", use_vrt=True)
+
+    default_vrts = {p.name for p in tmp_path.glob("_s3dep_mosaic_*.vrt")}
+    assert len(default_vrts) == 2
+
+    # The overlap row differs between default "last input wins" and `min`.
+    assert default.sel(y=6.5, method="nearest").to_numpy().tolist() == [20.0] * 4
+    assert minimum.sel(y=6.5, method="nearest").to_numpy().tolist() == [10.0] * 4
+
+
+def test_tiffs_to_da_merge_path_default(tmp_path):
+    """The default `use_vrt=False` path mosaics with rioxarray (no GDAL CLI).
+
+    Checks it produces the same overlap resolution as the VRT path, writes no
+    `_s3dep_mosaic_*.vrt` cache file, and rejects pixel functions that have no
+    `rasterio.merge` equivalent.
+    """
+    pytest.importorskip("rioxarray")
+    rasterio_transform = pytest.importorskip("rasterio.transform")
+
+    profile = {
+        "driver": "GTiff",
+        "dtype": "float32",
+        "width": 4,
+        "height": 4,
+        "count": 1,
+        "transform": rasterio_transform.from_origin(0.0, 10.0, 1.0, 1.0),
+        "crs": "EPSG:4326",
+    }
+    top = tmp_path / "top.tiff"
+    with rasterio.open(top, "w", **profile) as dst:
+        dst.write(np.full((4, 4), 10.0, dtype="float32"), 1)
+    bottom = tmp_path / "bottom.tiff"
+    bottom_profile = {**profile, "transform": rasterio_transform.from_origin(0.0, 7.0, 1.0, 1.0)}
+    with rasterio.open(bottom, "w", **bottom_profile) as dst:
+        dst.write(np.full((4, 4), 20.0, dtype="float32"), 1)
+
+    geometry = (0.0, 3.0, 4.0, 10.0)
+    default = s3dep.tiffs_to_da([top, bottom], geometry)
+    minimum = s3dep.tiffs_to_da([top, bottom], geometry, pixel_function="min")
+
+    # No VRT cache file is written by the merge path.
+    assert not list(tmp_path.glob("_s3dep_mosaic_*.vrt"))
+
+    # `None` => "last input wins" (20.0); `min` => 10.0 at the overlap row.
+    assert default.sel(y=6.5, method="nearest").to_numpy().tolist() == [20.0] * 4
+    assert minimum.sel(y=6.5, method="nearest").to_numpy().tolist() == [10.0] * 4
+
+    # Pixel functions without a `rasterio.merge` equivalent need the CLI.
+    with pytest.raises(ValueError, match="gdalbuildvrt"):
+        s3dep.tiffs_to_da([top, bottom], geometry, pixel_function="mean")
+
+
+def test_tiffs_to_da_merge_path_fills_gaps_with_nan(tmp_path):
+    """The merge path reads float tiles masked, so gaps become NaN not -9999."""
+    pytest.importorskip("rioxarray")
+    rasterio_transform = pytest.importorskip("rasterio.transform")
+
+    profile = {
+        "driver": "GTiff",
+        "dtype": "float32",
+        "width": 2,
+        "height": 2,
+        "count": 1,
+        "crs": "EPSG:4326",
+        "nodata": -9999.0,
+    }
+    left = tmp_path / "left.tiff"
+    with rasterio.open(
+        left, "w", **profile, transform=rasterio_transform.from_origin(0, 2, 1, 1)
+    ) as d:
+        d.write(np.full((2, 2), 1.0, dtype="float32"), 1)
+    right = tmp_path / "right.tiff"
+    with rasterio.open(
+        right, "w", **profile, transform=rasterio_transform.from_origin(4, 2, 1, 1)
+    ) as d:
+        d.write(np.full((2, 2), 2.0, dtype="float32"), 1)
+
+    # bbox spans both tiles and the gap between them (x in [2, 4)).
+    da = s3dep.tiffs_to_da([left, right], (0.0, 0.0, 6.0, 2.0))
+    arr = da.to_numpy()
+
+    assert np.isnan(arr).any()  # the uncovered gap is NaN
+    assert not (arr == -9999.0).any()  # the finite sentinel never surfaces
+    assert np.nanmin(arr) == 1.0
+    assert np.nanmax(arr) == 2.0
+
+
+@requires_gdalbuildvrt
+def test_build_vrt_uses_nan_for_float_mosaic_gaps(tmp_path):
+    """Float VRT gaps should not inject finite sentinels into downstream arrays."""
+    rasterio_transform = pytest.importorskip("rasterio.transform")
+
+    profile = {
+        "driver": "GTiff",
+        "dtype": "float32",
+        "width": 2,
+        "height": 2,
+        "count": 1,
+        "crs": "EPSG:4326",
+        "nodata": -9999.0,
+    }
+
+    left = tmp_path / "left.tiff"
+    with rasterio.open(
+        left, "w", **profile, transform=rasterio_transform.from_origin(0, 2, 1, 1)
+    ) as dst:
+        dst.write(np.full((2, 2), 1.0, dtype="float32"), 1)
+
+    right = tmp_path / "right.tiff"
+    with rasterio.open(
+        right, "w", **profile, transform=rasterio_transform.from_origin(4, 2, 1, 1)
+    ) as dst:
+        dst.write(np.full((2, 2), 2.0, dtype="float32"), 1)
+
+    vrt = tmp_path / "gap.vrt"
+    s3dep.build_vrt(vrt, [left, right])
+
+    with rasterio.open(vrt) as src:
+        data = src.read(1, masked=False)
+        nodata = src.nodata
+
+    assert np.isnan(nodata)
+    assert np.isnan(data[:, 2:4]).all()
+    assert np.nanmax(data) == 2.0
+
+
+def test_clip_geometry_resolves_bbox_and_geometry():
+    """`_clip_geometry` handles bbox tuples and any object with `.bounds`, no shapely."""
+
+    class _FakeGeom:
+        bounds = (-122.0, 37.0, -121.0, 38.0)
+
+    # A bbox sequence => envelope only, no geometry to clip to.
+    bounds, geom = _clip_geometry((-122.0, 37.0, -121.0, 38.0))
+    assert bounds == (-122.0, 37.0, -121.0, 38.0)
+    assert geom is None
+
+    # A geometry-like object => bounds plus the geometry itself.
+    fake = _FakeGeom()
+    bounds, geom = _clip_geometry(fake)
+    assert bounds == (-122.0, 37.0, -121.0, 38.0)
+    assert geom is fake
+
+    # Wrong length / non-finite / wrong type => TypeError.
+    for bad in [(-122.0, 37.0, -121.0), (-122.0, 37.0, -121.0, math.inf), "nope"]:
+        with pytest.raises(TypeError, match="geometry"):
+            _clip_geometry(bad)
 
 
 def test_tiffs_to_da_rejects_non_iterable_and_missing_files():
@@ -436,6 +626,7 @@ def test_clip_with_retry_does_not_leave_partial_cache_file(
     assert not target.with_name(f".{target.name}.tmp").exists()
 
 
+@requires_gdalbuildvrt
 def test_build_vrt_failure():
     """Test that `build_vrt` raises an error when given empty TIFF files."""
     with TemporaryDirectory() as tmpdir:
