@@ -41,9 +41,15 @@ optional-dependencies.dev = [
   "jupytext",
   "matplotlib",
   "nbconvert",
+  "pandas-stubs",
+  "pyproj",
   "pytest",
-  "pywbt>=0.2.8",
   "rioxarray",
+  "rioxarray",
+  "scipy-stubs",
+  "types-geopandas",
+  "types-pyyaml",
+  "whitebox-workflows",
 ]
 optional-dependencies.docs = [
   "jupytext",
@@ -63,7 +69,6 @@ optional-dependencies.test = [
   "pytest-cov",
   "pytest-sugar",
   "rioxarray",
-  "shapely",
 ]
 optional-dependencies.typecheck = [
   "pandas-stubs",
@@ -71,10 +76,8 @@ optional-dependencies.typecheck = [
   "pyright",
   "rioxarray",
   "scipy-stubs",
-  "shapely",
   "types-geopandas",
   "types-pyyaml",
-  "types-shapely",
   "xarray",
 ]
 urls.Changelog = "https://docs.hyriver.io/seamless-3dep/latest/CHANGELOG/"
@@ -84,10 +87,10 @@ urls.Homepage = "https://docs.hyriver.io/seamless-3dep"
 urls.Issues = "https://github.com/hyriver/seamless-3dep/issues"
 
 [tool.hatch]
+version.source = "vcs"
 build.targets.wheel.packages = [
   "src/seamless_3dep",
 ]
-version.source = "vcs"
 
 [tool.pixi.environments]
 dev = { features = [ "dev", "py314" ] }
@@ -96,9 +99,6 @@ test314 = { features = [ "test", "py314" ] }
 typecheck = { features = [ "typecheck", "py314" ] }
 lint = { features = [ "lint", "py314" ], no-default-feature = true }
 docs = { features = [ "docs", "py314" ] }
-
-[tool.pixi.feature.dev.dependencies]
-libgdal-core = ">=3.12"
 
 [tool.pixi.feature.dev.tasks]
 # Sync all percent-format .py scripts → paired .ipynb files, then trust them
@@ -125,12 +125,13 @@ spell = "codespell -w"
 
 [tool.pixi.feature.py312.dependencies]
 python = "~=3.12.0"
+libgdal-core = ">=3.12"
+proj = "*"
 
 [tool.pixi.feature.py314.dependencies]
 python = "~=3.14.0"
-
-[tool.pixi.feature.test.dependencies]
 libgdal-core = ">=3.12"
+proj = "*"
 
 [tool.pixi.feature.test.tasks]
 test = "pytest -m 'not network'"
@@ -147,7 +148,7 @@ seamless_3dep = { path = ".", editable = true }
 
 [tool.pixi.workspace]
 channels = [ "conda-forge" ]
-platforms = [ "linux-64", "osx-64", "osx-arm64", "win-64" ]
+platforms = [ "linux-64", "osx-arm64", "win-64" ]
 
 [tool.ruff]
 target-version = "py312"
@@ -159,10 +160,10 @@ lint.ignore = [
   "ANN",     # pyright is better at this
   "B905",    # zip without strict is fine
   "COM",     # ruff format takes care of our commas
-  "D",       # we prefer our own docstring style
+  "D107",    # we don't require docstrings on __init__
+  "D203",    # incompatible with D211
+  "D212",    # incompatible with D213
   "E501",    # leave line-length enforcement to ruff format
-  "FBT",     # we don't hate bool args around here
-  "FIX",     # yes, we want XXX as a marker
   "ISC001",  # conflicts with ruff format
   "N",       # we need more naming freedom
   "PLC0415", # sometimes, imports have to live elsewhere
@@ -170,7 +171,6 @@ lint.ignore = [
   "PLR2004", # numbers are sometimes fine
   "TC001",   # first-party typing-only imports are cheap, keep simple for docs
   "TC003",   # stdlib typing-only imports are cheap, keep simple for docs
-  "TRY301",  # raising within try/except is fine for us
 ]
 lint.per-file-ignores."docs/*.py" = [
   "A001",   # shadowing builtins like `license` is fine for file paths
@@ -179,7 +179,8 @@ lint.per-file-ignores."docs/*.py" = [
 lint.per-file-ignores."docs/examples/*.ipynb" = [
   # notebook-generated files
   "B018",
-  "D100",
+  # we don't require docstrings in notebooks
+  "D",
   # Module level imports
   "E402",
   # we have commented-out code in notebook headers
@@ -188,7 +189,8 @@ lint.per-file-ignores."docs/examples/*.ipynb" = [
 lint.per-file-ignores."docs/examples/*.py" = [
   # notebook-generated files
   "B018",
-  "D100",
+  # we don't require docstrings in notebooks
+  "D",
   # Module level imports
   "E402",
   # we have commented-out code in notebook headers
@@ -200,6 +202,7 @@ lint.per-file-ignores."tests/*.py" = [
   "B017",    # pytest.raises(Exception) is fine
   "B018",    # pointless expressions in tests aren't pointless
   "BLE001",  # Blind excepts are fine in tests
+  "D",       # we don't need docstrings on test functions
   "DTZ",     # datetime best practices don't matter in tests
   "EM",      # no need for exception msg hygiene in tests
   "INP001",  # no need for init files in tests
@@ -226,21 +229,21 @@ lint.isort.known-first-party = [ "seamless_3dep" ]
 lint.isort.required-imports = [ "from __future__ import annotations" ]
 
 [tool.codespell]
-skip = "__pycache__,_build,.mypy_cache,.git,./htmlcov,.pixi,pixi.lock,**.ipynb"
 ignore-words-list = "gage,gages"
+skip = "__pycache__,_build,.mypy_cache,.git,./htmlcov,.pixi,pixi.lock,**.ipynb"
 
 [tool.pyproject-fmt]
 expand_tables = [ "tool.git-cliff", "tool.pixi" ]
 
 [tool.pyright]
 pythonVersion = "3.12"
+typeCheckingMode = "strict"
 include = [ "src" ]
 ignore = [
-  "docs/examples/*.py",
   "docs/examples/*.ipynb",
+  "docs/examples/*.py",
   "tests/*.py",
 ]
-typeCheckingMode = "strict"
 # Third-party libs in scientific Python often lack complete stubs
 reportMissingTypeStubs = false
 reportUnknownArgumentType = false
@@ -250,6 +253,9 @@ reportUnknownParameterType = false
 reportUnknownVariableType = false
 
 [tool.pytest]
+ini_options.testpaths = [
+  "tests",
+]
 ini_options.addopts = [
   "--import-mode=importlib",
   "-v",
@@ -261,13 +267,10 @@ ini_options.addopts = [
   "--durations=5",
   "--basetemp=.pytest_tmp",
 ]
-ini_options.doctest_optionflags = "NORMALIZE_WHITESPACE IGNORE_EXCEPTION_DETAIL NUMBER"
 ini_options.markers = [
   "network: tests that make requests to external services",
 ]
-ini_options.testpaths = [
-  "tests",
-]
+ini_options.doctest_optionflags = "NORMALIZE_WHITESPACE IGNORE_EXCEPTION_DETAIL NUMBER"
 
 [tool.coverage]
 run.branch = true
