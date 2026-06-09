@@ -24,6 +24,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import geopandas as gpd
+import whitebox_workflows as wbw
 
 import seamless_3dep as s3dep
 
@@ -54,24 +55,24 @@ ax = dem.plot.imshow(robust=True)
 ax.figure.savefig("images/dem.png")
 
 # %% [markdown]
-# Next, we use [PyWBT](https://pywbt.readthedocs.io) to compute the slope from the retrieved DEM tiles.
+# Next, we use `whitebox_workflows` to compute the slope from the retrieved DEM tiles.
 
 # %%
-import shutil
-from tempfile import TemporaryDirectory
+wbe = wbw.WbEnvironment()
 
-import pywbt
 
-slope_wbt_files = [data_dir / fname.name.replace("dem", "slope") for fname in dem_tiffs]
-for dname, sname in zip(dem_tiffs, slope_wbt_files):
-    with TemporaryDirectory(dir=data_dir) as temp:
-        shutil.copy(dname, temp)
-        wbt_args = {
-            "BreachDepressions": [f"-i={dname.name}", "--fill_pits", "-o=dem_corr.tiff"],
-            "Slope": ["-i=dem_corr.tiff", "--units=degrees", f"-o={sname.name}"],
-        }
-        pywbt.whitebox_tools(temp, wbt_args, [sname.name], temp)
-        shutil.copy(Path(temp) / sname.name, data_dir)
+def compute_slope(dem_path: Path) -> Path:
+    slope_path = dem_path.with_name(dem_path.name.replace("dem", "slope"))
+    dem = wbe.read_raster(dem_path.as_posix())
+    dem = wbe.hydrology.depressions_storage.breach_depressions_least_cost(
+        dem=dem, dist=50, minimize_dist=True, flat_increment=None, fill_deps=True
+    )
+    slope = wbe.terrain.derivatives.slope(input=dem, units="degrees")
+    wbe.write_raster(slope, slope_path.as_posix())
+    return slope_path
+
+
+slope_wbt_files = [compute_slope(dem_path) for dem_path in dem_tiffs]
 
 # %%
 slope = s3dep.tiffs_to_da(slope_wbt_files, geom_org.bounds, crs=4326)

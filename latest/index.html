@@ -26,7 +26,7 @@
           <link rel="icon" href="assets/hyriver_logo.png">
         
       
-      <meta name="generator" content="mkdocs-ProperDocs 1.6.7, mkdocs-materialx-10.1.6">
+      <meta name="generator" content="mkdocs-ProperDocs 1.6.7, mkdocs-materialx-10.1.7">
     
     
       
@@ -34,7 +34,7 @@
       
     
     
-      <link rel="stylesheet" href="assets/stylesheets/main.9d7f4a96.min.css">
+      <link rel="stylesheet" href="assets/stylesheets/main.ad98c137.min.css">
       
         
         <link rel="stylesheet" href="assets/stylesheets/palette.a45159b5.min.css">
@@ -1054,15 +1054,19 @@ processing:</p>
 <li><code>decompose_bbox</code>: Handles large area requests by breaking down extensive bounding
     boxes into optimal sizes based on resolution and maximum pixel count, ensuring
     efficient data retrieval.</li>
-<li><code>build_vrt</code>: Creates virtual raster datasets by combining multiple GeoTIFF files.
-    Requires <code>libgdal-core</code> installation and supports efficient data handling for large
-    areas. Note that <code>libgdal-core</code> is an optional dependency and is not installed when
-    <code>seamless-3dep</code> is installed from PyPI. However, it is installed as a dependency
-    when <code>seamless-3dep</code> is installed from <code>conda-forge</code>.</li>
-<li><code>tiffs_to_da</code>: Converts a list of GeoTIFF files to an <code>xarray.DataArray</code> object. This
-    function is useful for combining multiple GeoTIFF files that <code>get_map</code>, <code>get_dem</code>,
-    and <code>get_global_dem</code> produce into a single <code>xarray.DataArray</code> for further analysis.
-    Note that <code>shapely</code> and <code>rioxarray</code> need to be installed to use this function.</li>
+<li><code>build_vrt</code>: Creates a virtual raster dataset by combining multiple GeoTIFF files via
+    the <code>gdalbuildvrt</code> CLI. Supports a <code>resampling</code> parameter (default <code>"nearest"</code>) and
+    automatically sets NaN as the nodata value for float rasters so mosaic gaps appear as
+    <code>NaN</code> rather than finite sentinels. Requires the <code>libgdal</code>/<code>gdal</code> conda-forge package
+    (which ships <code>gdalbuildvrt</code>); note that <code>libgdal-core</code> provides the library but not
+    the CLI utilities.</li>
+<li><code>tiffs_to_da</code>: Mosaics a list of GeoTIFF files and returns a clipped
+    <code>xarray.DataArray</code>. By default (<code>use_vrt=False</code>) tiles are merged in memory via
+    <code>rioxarray.merge.merge_arrays</code> — only <code>rioxarray</code> is required, no <code>gdalbuildvrt</code> CLI
+    or <code>shapely</code>. Pass <code>use_vrt=True</code> to mosaic through a VRT file instead, which enables
+    GDAL pixel functions such as <code>"mean"</code> and <code>"median"</code> but requires <code>gdalbuildvrt</code>. The
+    <code>geometry</code> parameter accepts any object with a <code>.bounds</code> attribute (e.g., any shapely
+    geometry) or a plain <code>(west, south, east, north)</code> bounding box tuple.</li>
 </ul>
 <h2 id="important-notes">Important Notes<a class="headerlink" href="#important-notes" title="Permanent link">#</a></h2>
 <ul>
@@ -1233,7 +1237,7 @@ guidelines and instructions.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": ".", "code": null, "features": ["content.tabs.link", "content.code.copy", "content.action.edit", "content.code.annotate", "navigation.sections", "navigation.expand", "navigation.collapse", "navigation.instant", "navigation.instant.progress", "navigation.tracking", "navigation.top", "navigation.footer", "navigation.indexes", "navigation.tabs", "navigation.tabs.sticky", "navigation.path", "search.suggest", "search.highlight", "toc.follow", "toc.integrate"], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "code.collapse": "Collapse", "code.download": "Download", "code.expand": "Expand remaining # lines", "code.select": "Toggle line selection", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="assets/javascripts/bundle.4e7371e1.min.js"></script>
+      <script src="assets/javascripts/bundle.fc193f93.min.js"></script>
       
     
   </body>

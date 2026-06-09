@@ -28,7 +28,7 @@
           <link rel="icon" href="../assets/hyriver_logo.png">
         
       
-      <meta name="generator" content="mkdocs-ProperDocs 1.6.7, mkdocs-materialx-10.1.6">
+      <meta name="generator" content="mkdocs-ProperDocs 1.6.7, mkdocs-materialx-10.1.7">
     
     
       
@@ -36,7 +36,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.9d7f4a96.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.ad98c137.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.a45159b5.min.css">
@@ -710,6 +710,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#seamless_3dep.seamless_3dep.GeometryLike" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GeometryLike
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#seamless_3dep.seamless_3dep.Get3DEPErrors" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -960,6 +971,54 @@
 
 
 
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="seamless_3dep.seamless_3dep.GeometryLike" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">GeometryLike</span>
+
+
+<a href="#seamless_3dep.seamless_3dep.GeometryLike" class="headerlink" title="Permanent link">#</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-external" title="typing.Protocol" href="https://docs.python.org/3/library/typing.html#typing.Protocol">Protocol</a></code></p>
+
+
+
+        <p>A geometry exposing a shapely-style <code>(minx, miny, maxx, maxy)</code> envelope.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
 
 <div class="doc doc-object doc-class">
 
@@ -1612,7 +1671,13 @@ not allowed.</p>
 
 
 <a href="#seamless_3dep.seamless_3dep.build_vrt" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">build_vrt</span><span class="p">(</span><span class="n">vrt_path</span><span class="p">,</span> <span class="n">tiff_files</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">pixel_function</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">build_vrt</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">vrt_path</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">tiff_files</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">pixel_function</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">resampling</span><span class="o">=</span><span class="s2">&quot;nearest&quot;</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
@@ -1666,6 +1731,24 @@ differ between tiles. Common values: <code>"first"</code>, <code>"mean"</code>,
 <code>"geometric_mean"</code>, <code>"harmonic_mean"</code>. Requires GDAL 3.12+.</p>
           </div>
         </li>
+        <li class="doc-section-item field-body">
+            <b><code>resampling</code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>, default:
+                  <code>&#39;nearest&#39;</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>Resampling method to use when building the VRT, by default <code>"nearest"</code>.
+<code>"nearest"</code> avoids propagating NaN from tile-boundary fringe pixels
+into the mosaic interior when source tiles have slightly different pixel
+grids (fractional <code>DstRect</code> offsets). Use <code>"bilinear"</code> or higher
+only when you need smooth blending across deliberately different
+resolutions. Must be one of <code>"nearest"</code>, <code>"bilinear"</code>, <code>"cubic"</code>,
+<code>"cubicspline"</code>, <code>"lanczos"</code>, <code>"average"</code>, or <code>"mode"</code>. See the
+GDAL documentation for details:
+https://gdal.org/programs/gdalbuildvrt.html</p>
+          </div>
+        </li>
     </ul>
 
 
@@ -1682,13 +1765,19 @@ differ between tiles. Common values: <code>"first"</code>, <code>"mean"</code>,
 
 <a href="#seamless_3dep.seamless_3dep.tiffs_to_da" class="headerlink" title="Permanent link">#</a></h2>
 <div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">tiffs_to_da</span><span class="p">(</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">tiff_files</span><span class="p">,</span> <span class="n">geometry</span><span class="p">,</span> <span class="n">crs</span><span class="o">=</span><span class="mi">4326</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">pixel_function</span><span class="o">=</span><span class="kc">None</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">tiff_files</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">geometry</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">crs</span><span class="o">=</span><span class="mi">4326</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">pixel_function</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">resampling</span><span class="o">=</span><span class="s2">&quot;nearest&quot;</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">use_vrt</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="p">)</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Convert a list of tiff files to a vrt file and return a xarray.DataArray.</p>
+        <p>Mosaic a list of tiff files and return a clipped xarray.DataArray.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -1703,10 +1792,13 @@ differ between tiles. Common values: <code>"first"</code>, <code>"mean"</code>,
         </li>
         <li class="doc-section-item field-body">
             <b><code>geometry</code></b>
-              (<code><span title="shapely.Polygon">Polygon</span> or <a class="autorefs autorefs-external" title="collections.abc.Sequence" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence">Sequence</a></code>)
+              (<code>geometry or sequence of float</code>)
           –
           <div class="doc-md-description">
-            <p>Polygon or bounding box in the form (west, south, east, north).</p>
+            <p>A geometry exposing a shapely-style <code>bounds</code> attribute (e.g. a
+shapely geometry), or a bounding box <code>(west, south, east, north)</code>.
+A geometry is additionally clipped to its exact shape; a bounding box
+clips to the envelope only.</p>
           </div>
         </li>
         <li class="doc-section-item field-body">
@@ -1726,11 +1818,38 @@ differ between tiles. Common values: <code>"first"</code>, <code>"mean"</code>,
 )
           –
           <div class="doc-md-description">
-            <p>VRT pixel function for resolving overlap between tiles, forwarded
-to :func:<code>build_vrt</code>. Defaults to <code>None</code> (<code>gdalbuildvrt</code>'s
-"last input wins"). Use e.g. <code>"mean"</code> or <code>"first"</code> when
-mosaicking per-tile post-processed outputs whose overlap pixels
-differ between tiles. Requires GDAL 3.12+.</p>
+            <p>Function for resolving overlap between tiles, by default <code>None</code>
+("last input wins"). With <code>use_vrt=True</code> this is forwarded to
+:func:<code>build_vrt</code> and accepts any GDAL pixel function (e.g.
+<code>"mean"</code>, requires GDAL 3.12+). With the default in-memory path
+(<code>use_vrt=False</code>) only <code>None</code> and <code>"first"</code>/<code>"min"</code>/<code>"max"</code>
+are supported.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>resampling</code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>, default:
+                  <code>&#39;nearest&#39;</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>Resampling method forwarded to :func:<code>build_vrt</code>, by default
+<code>"nearest"</code>. Only used when <code>use_vrt=True</code>; ignored by the
+in-memory mosaic. See :func:<code>build_vrt</code>.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>use_vrt</code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>, default:
+                  <code>False</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>If <code>True</code>, mosaic via a lazily-read VRT built with the
+<code>gdalbuildvrt</code> CLI (requires the conda <code>libgdal</code>/<code>gdal</code> package,
+not just <code>libgdal-core</code>). If <code>False</code> (default), mosaic in memory
+with :func:<code>rioxarray.merge.merge_arrays</code>, which needs no GDAL
+command-line tool — only <code>rasterio</code>/<code>rioxarray</code>.</p>
           </div>
         </li>
     </ul>
@@ -2005,7 +2124,7 @@ values in meters.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "..", "code": null, "features": ["content.tabs.link", "content.code.copy", "content.action.edit", "content.code.annotate", "navigation.sections", "navigation.expand", "navigation.collapse", "navigation.instant", "navigation.instant.progress", "navigation.tracking", "navigation.top", "navigation.footer", "navigation.indexes", "navigation.tabs", "navigation.tabs.sticky", "navigation.path", "search.suggest", "search.highlight", "toc.follow", "toc.integrate"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "code.collapse": "Collapse", "code.download": "Download", "code.expand": "Expand remaining # lines", "code.select": "Toggle line selection", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.4e7371e1.min.js"></script>
+      <script src="../assets/javascripts/bundle.fc193f93.min.js"></script>
       
     
   </body>
